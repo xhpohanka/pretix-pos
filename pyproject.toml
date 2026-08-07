@@ -1,0 +1,35 @@
+[project]
+name = "pretix-pos"
+dynamic = ["version"]
+description = "Box-office point-of-sale tool for pretix: direct sales, reservations, and taking payment for existing orders."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["pretix"]
+authors = [
+    {name = "Jan Pohanka"},
+]
+
+dependencies = [
+]
+
+[project.entry-points."pretix.plugin"]
+pretix_pos = "pretix_pos:PretixPluginMeta"
+
+[project.entry-points."distutils.commands"]
+build = "pretix_plugin_build.build:CustomBuild"
+
+[build-system]
+requires = [
+    "setuptools",
+    "pretix-plugin-build",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+version = {attr = "pretix_pos.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["pretix*"]
+namespaces = false

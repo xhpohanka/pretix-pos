@@ -1,0 +1,4 @@
+[plugin]
+package = "pretix-pos"
+modules = [ "pretix_pos" ]
+marketplace_name = "pos"

@@ -1,0 +1,45 @@
+#pretix-pos .pos-item-row {
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+#pretix-pos .pos-item-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+#pretix-pos .pos-qty-picker {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    max-width: 420px;
+}
+
+#pretix-pos .pos-qty-picker select {
+    flex: 2;
+}
+
+#pretix-pos .pos-qty-picker input.pos-qty {
+    flex: 0 0 70px;
+}
+
+#pretix-pos .pos-cart-list {
+    list-style: none;
+    padding-left: 0;
+}
+
+#pretix-pos .pos-cart-list li {
+    padding: 2px 0;
+}
+
+#pretix-pos .pos-search-result {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+#pretix-pos .pos-search-result:hover {
+    background: #f5f5f5;
+}
