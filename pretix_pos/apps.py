@@ -1,5 +1,6 @@
 from django.apps import AppConfig
 from django.utils.translation import gettext_lazy as _
+from pretix.base.plugins import PLUGIN_LEVEL_ORGANIZER
 
 from . import __version__
 
@@ -12,12 +13,14 @@ class PluginApp(AppConfig):
         name = _("Point of sale")
         author = "Jan Pohanka"
         description = _(
-            "Box-office tool for staff: search orders, sell tickets directly, take reservations, "
-            "confirm cash payment, and hand off to Seating for seat assignment."
+            "Standalone box-office terminal app: pair a device (no pretix login needed), pick an "
+            "event, then sell tickets for cash, take reservations, sell existing reservations, and "
+            "place or move seats - from any browser on any computer."
         )
         visible = True
         version = __version__
         category = "FEATURE"
+        level = PLUGIN_LEVEL_ORGANIZER
         compatibility = "pretix>=4.16.0"
 
     def ready(self):

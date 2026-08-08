@@ -1,8 +1,9 @@
 # pretix-pos
 
-Box-office point-of-sale tool for pretix staff: a stripped-down control-panel
-page (per event) for the workflows a physical ticket counter actually needs,
-instead of the full order-management UI.
+Standalone box-office terminal for pretix: a small single-page app that pairs
+itself to a pretix organizer via the Device API (no shared staff login) and
+talks directly to pretix's public REST API. Any browser with the pairing
+token can become a POS terminal.
 
 Internal, closed-source plugin — not for redistribution.
 
@@ -16,46 +17,109 @@ pip install -e .
 cd ../pretix/src && python manage.py migrate
 ```
 
-Enable it per-event under Control panel → Settings → Plugins. Find it under
-"Point of sale" in the event's sidebar.
+Enable it per-organizer under Control panel → (organizer) → Plugins, then
+open `https://<your-instance>/<organizer-slug>/pos/` in any browser - no
+pretix login required for that page itself.
+
+## Pairing a terminal
+
+1. In the pretix control panel: organizer → Devices → add a device (or reuse
+   an unpaired one) → open its "Connect" page. This is all existing pretix
+   core functionality - nothing new was built for it.
+2. Copy the "Token" shown there.
+3. On the POS page, paste the token and submit. The browser stores the
+   resulting device API token in `localStorage` and is now paired - this
+   persists across reloads, so a terminal only needs to be paired once.
+4. Pick an event from the list (scoped to whatever events the device was
+   granted - `all_events` or a specific `limit_events` set).
+
+To un-pair a terminal (e.g. it's being retired or moved to a different
+organizer), use the "Unpair this device" link in the app header - this only
+clears the browser's local pairing, it does not revoke the device server-side
+(do that from the Devices page if the device itself should stop working).
 
 ## Scope
 
-- **Direct sale**: pick items (quantity, or click seats directly for
-  seated items) and confirm cash payment in one step - order is created
-  already `paid`.
+- **Direct sale**: pick items (quantity, or click seats for seated items) and
+  confirm cash payment in one step - the order is created directly as `paid`
+  with the `boxoffice` payment provider.
 - **Reservation**: same item/seat picking, but the order is left `pending`
-  with the event's normal payment term as its expiry - nothing is charged yet.
-- **Sell a reservation**: find an existing pending order and confirm cash
-  payment for the outstanding amount.
-- **Order search**: a single fuzzy field (order code, e-mail, attendee name, …)
-  - reuses core's own control-panel order search (`EventOrderFilterForm`),
-    scoped to the event currently open.
-- **Seat (re)assignment**: not reimplemented here - if the `pretix_seating`
-  plugin is enabled for the event, an order's detail panel links straight
-  into its seat-assignment page (`?code=...` deep link) for placing/moving
-  seats on already-existing orders (e.g. resolving oversold reservations).
+  with the event's normal payment term as its expiry.
+- **Sell a reservation**: search for the order, then take its outstanding
+  payment.
+- **Order search**: a single fuzzy field (order code, e-mail, attendee
+  name, …), backed by the public API's own `?search=` order filter.
+- **Seat placement / reassignment**: from an order's detail view, drag a
+  rectangle over free seats to multi-select them, then place them onto the
+  order's checked positions in one action; drag an already-placed seat of
+  that order onto a free seat to move it.
 
-## Design decisions / v1 scope
+## Architecture
 
-- **Event-scoped, not organizer-scoped.** A box office generally works one
-  production/venue (one pretix event) at a time, with many dates
-  (subevents) - the built-in event switcher already covers "a different
-  show entirely". This also means it reuses the same permission
-  (`can_change_orders`) and URL conventions as every other per-event
-  control-panel page/plugin in this codebase.
-- **Order creation goes through `OrderCreateSerializer`** (the same
-  synchronous, transactional order-creation path the public REST API uses),
-  not the celery-queued public-checkout cart flow - appropriate for an
-  interactive, in-person sale where staff need an immediate result.
-- **Cash payment** creates and confirms an `OrderPayment` with the plain
-  `manual` provider identifier, exactly like the control panel's own
-  "mark as paid" action does - no payment gateway involved.
+Almost no server-side logic lives in this plugin - it's a thin static shell
+(`pretix_pos/organizer/pos.html` + `static/pretix_pos/pos.js`) that calls
+pretix's own public REST API (`/api/v1/...`) directly from the browser using
+`Authorization: Device <token>`, the same mechanism pretixSCAN and other
+official terminal apps use:
+
+- **Device pairing**: `POST /api/v1/device/initialize` (pretix core).
+- **Event list**: `GET /api/v1/organizers/{organizer}/events/` - naturally
+  scoped by the device's `all_events`/`limit_events`.
+- **Items**: `GET .../events/{event}/items/`.
+- **Order create (sale/reservation)**: `POST .../events/{event}/orders/`
+  using `OrderCreateSerializer` - the same synchronous, transactional path
+  the public checkout API uses. `payment_provider: "boxoffice"` is used for
+  immediate cash sales (pretix core's `BoxOfficeProvider`, always registered,
+  no plugin needs to be enabled for it).
+- **Paying an existing reservation**: `POST .../orders/{code}/payments/`
+  (create, state `created`) then `POST .../payments/{id}/confirm/` -
+  deliberately two calls instead of creating the payment directly as
+  `confirmed`, because the single-call path silently swallows a
+  `QuotaExceededException` instead of surfacing it; the explicit `confirm`
+  action returns a proper error if the quota disappeared between reservation
+  and payment.
+- **Seat (re)assignment**: `PATCH .../events/{event}/orderpositions/{id}/`
+  with `{"seat": "<guid>"}` - goes through the same `OrderChangeManager` the
+  control panel's own order-editing UI uses, just reachable with a device
+  token instead of a staff session.
+- **Seat map with coordinates**: pretix core's own public `/seats/` endpoint
+  deliberately omits the `x`/`y` drawing coordinates (they only exist because
+  `pretix_seating` materializes them from a `SeatingPlan` layout). This
+  plugin's sibling, `pretix_seating`, therefore registers an additional
+  `/seatmap/` endpoint (`pretix_seating/api.py`) onto the same shared API
+  router, adding `x`, `y`, and a precomputed `status` on top of core's own
+  `SeatSerializer` fields - reachable with the same device token, read-only.
+  This app only draws a seat map at all if `pretix_seating` is installed
+  (checked via `window.PretixSeatingRenderer` - `pretix_seating`'s
+  `seatmap.js` is loaded unconditionally and just does nothing if that
+  plugin isn't present).
+
+Because the whole thing is client-side and hits the same public API any
+other integration would, there is very little bespoke server code to
+maintain here - the only Django view is a single `TemplateView` that renders
+the static shell and 404s if the plugin isn't enabled for that organizer
+(`pretix_pos/views.py`).
+
+## Known v1 limitations
+
+- **Bulk seat placement is not atomic.** Placing N seats on N positions in
+  one action issues N sequential `PATCH` requests; a failure partway through
+  leaves the earlier ones placed. The UI reports exactly how many succeeded
+  and which failed rather than pretending it's all-or-nothing.
+- **Multi-date orders**: if an order's positions span more than one
+  subevent, the seat map is not shown for that order at all (v1 only
+  resolves the seat map for a single date at a time).
+- **Seated items with variations** are not supported for direct seat-picking
+  (same underlying limitation as `pretix_seating`: `SeatCategoryMapping`
+  only maps a layout category to an `Item`, never a specific
+  `ItemVariation`).
 - **Sales channel**: orders are created on the `web` channel (no dedicated
-  "point of sale" channel yet). If you need item availability to differ
-  between the box office and the online shop, this would be the first
-  thing to add.
-- Seated items with **variations** are not supported for direct
-  seat-picking in v1 (mirrors the same limitation in `pretix_seating`:
-  `SeatCategoryMapping` only maps a layout category to an `Item`, never a
-  specific `ItemVariation`).
+  POS sales channel yet). If item availability needs to differ between the
+  box office and the online shop, this would be the first thing to add.
+- **Estimated cart total only.** The cart shows a client-side sum of known
+  default prices before submission; the authoritative price is always
+  computed server-side by `OrderCreateSerializer`.
+- The device's API token is stored in the browser's `localStorage` on
+  whatever computer is paired - treat a paired browser like a signed-in
+  terminal (it can create/pay orders and move seats for every event the
+  device has access to) and unpair it before repurposing that computer.

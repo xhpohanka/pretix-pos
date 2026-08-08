@@ -1,0 +1,101 @@
+{% load i18n static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% trans "Point of sale" %} - {{ organizer.name }}</title>
+    <link rel="stylesheet" href="{% static "pretix_pos/pos.css" %}">
+</head>
+<body>
+    <div id="pos-app"
+         data-organizer="{{ organizer.slug }}"
+         data-api-base="/api/v1">
+
+        <header id="pos-header">
+            <strong>{% trans "Point of sale" %}</strong>
+            <span id="pos-header-info"></span>
+            <span class="pos-header-spacer"></span>
+            <button id="pos-btn-change-event" type="button" class="pos-btn-link" hidden>{% trans "Change event" %}</button>
+            <button id="pos-btn-unpair" type="button" class="pos-btn-link" hidden>{% trans "Unpair this device" %}</button>
+        </header>
+
+        <main id="pos-main-area">
+
+            <section id="pos-screen-pair">
+                <h1>{% trans "Pair this terminal" %}</h1>
+                <p>
+                    {% blocktrans %}
+                        In the pretix control panel, go to your organizer's "Devices" page, add a
+                        device (or reuse an existing unpaired one) and open its "Connect" page.
+                        Paste the token shown there below.
+                    {% endblocktrans %}
+                </p>
+                <form id="pos-pair-form">
+                    <label for="pos-pair-token">{% trans "Initialization token" %}</label>
+                    <input type="text" id="pos-pair-token" autocomplete="off" required>
+                    <button type="submit">{% trans "Connect" %}</button>
+                </form>
+                <div id="pos-pair-msg" class="pos-msg"></div>
+            </section>
+
+            <section id="pos-screen-events" hidden>
+                <h1>{% trans "Choose an event" %}</h1>
+                <div id="pos-events-list" class="pos-msg">{% trans "Loading…" %}</div>
+            </section>
+
+            <section id="pos-screen-main" hidden>
+                <div id="pos-subevent-bar" hidden>
+                    <label for="pos-subevent">{% trans "Date" %}</label>
+                    <select id="pos-subevent"></select>
+                </div>
+
+                <nav id="pos-tabs">
+                    <button type="button" class="pos-tab active" data-tab="sell">{% trans "Sell / Reserve" %}</button>
+                    <button type="button" class="pos-tab" data-tab="find">{% trans "Find order" %}</button>
+                </nav>
+
+                <div id="pos-tab-sell" class="pos-tab-panel">
+                    <div class="pos-columns">
+                        <div class="pos-col">
+                            <h2>{% trans "Items" %}</h2>
+                            <div id="pos-items" class="pos-msg">{% trans "Loading…" %}</div>
+
+                            <div id="pos-seatpick-wrap" hidden>
+                                <h3 id="pos-seatpick-title"></h3>
+                                <p class="pos-hint">{% trans "Click free (green) seats to add them to the cart. Click a selected seat again to remove it." %}</p>
+                                <svg id="pos-svg-sell" class="pos-seatmap"></svg>
+                            </div>
+                        </div>
+                        <div class="pos-col">
+                            <h2>{% trans "Cart" %}</h2>
+                            <div id="pos-cart" class="pos-msg">{% trans "Empty." %}</div>
+                            <label for="pos-email">{% trans "Customer e-mail" %} ({% trans "optional" %})</label>
+                            <input type="email" id="pos-email">
+                            <div class="pos-actions">
+                                <button id="pos-btn-reserve" type="button" disabled>{% trans "Reserve" %}</button>
+                                <button id="pos-btn-sell" type="button" class="pos-btn-primary" disabled>{% trans "Sell now (cash)" %}</button>
+                            </div>
+                            <div id="pos-sell-msg" class="pos-msg"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="pos-tab-find" class="pos-tab-panel" hidden>
+                    <div class="pos-search-bar">
+                        <input type="text" id="pos-search" placeholder="{% trans "Order code, name, e-mail…" %}">
+                        <button id="pos-search-btn" type="button">{% trans "Search" %}</button>
+                    </div>
+                    <div id="pos-search-results"></div>
+                    <div id="pos-order-detail" hidden></div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="{% static "pretix_seating/seatmap.js" %}"></script>
+    <script src="{% static "pretix_pos/pos.js" %}"></script>
+</body>
+</html>
