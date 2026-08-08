@@ -586,9 +586,10 @@
             div.className = "pos-search-result";
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
+            var pending = pendingSum(o);
             div.appendChild(document.createTextNode(
                 " — " + (o.email || "no e-mail") + " — " + o.status + " — total " + o.total +
-                (parseFloat(o.pending_sum) > 0 ? ", pending " + o.pending_sum : "")
+                (parseFloat(pending) > 0 ? ", pending " + pending : "")
             ));
             div.addEventListener("click", function () { loadOrderDetail(o.code); });
             searchResultsEl.appendChild(div);
@@ -606,6 +607,16 @@
             placementPool = {};
             renderOrderDetail();
         });
+    }
+
+    // The public API's OrderSerializer has no pending_sum field (unlike the
+    // internal Order model, which computes it server-side) - derive it from
+    // the confirmed payments actually present in the order's own response.
+    function pendingSum(order) {
+        var paid = (order.payments || [])
+            .filter(function (p) { return p.state === "confirmed"; })
+            .reduce(function (sum, p) { return sum + parseFloat(p.amount); }, 0);
+        return (parseFloat(order.total) - paid).toFixed(2);
     }
 
     function positionLabel(p) {
@@ -627,8 +638,9 @@
         h.textContent = order.code + " — " + order.status;
         orderDetailEl.appendChild(h);
 
+        var pending = pendingSum(order);
         var p = document.createElement("p");
-        p.textContent = "Total: " + order.total + (parseFloat(order.pending_sum) > 0 ? " — pending: " + order.pending_sum : " — fully paid");
+        p.textContent = "Total: " + order.total + (parseFloat(pending) > 0 ? " — pending: " + pending : " — fully paid");
         orderDetailEl.appendChild(p);
 
         var positions = (order.positions || []).filter(function (pos) { return !pos.canceled; });
@@ -728,7 +740,7 @@
         setMsg(msg, "Charging…", null);
         api(eventPath("/orders/" + order.code + "/payments/"), {
             method: "POST",
-            body: JSON.stringify({provider: "boxoffice", amount: order.pending_sum, state: "created"}),
+            body: JSON.stringify({provider: "boxoffice", amount: pendingSum(order), state: "created"}),
         }).then(function (res) {
             if (!res.ok) {
                 setMsg(msg, describeError(res.data), "error");
