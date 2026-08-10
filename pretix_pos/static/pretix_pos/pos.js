@@ -58,6 +58,35 @@
             });
     }
 
+    // The public API paginates list endpoints (PAGE_SIZE=50) - a plan with
+    // more than 50 seats (any real venue above ~3 rows of 15) silently lost
+    // every seat past the first page, since api() alone only ever fetched
+    // page 1. Deliberately does NOT follow the response's own "next" URL -
+    // that's an *absolute* URL built server-side from the request host, which
+    // doesn't match the browser's actual origin behind a reverse proxy/tunnel
+    // (confirmed live behind this deployment's ngrok tunnel: fetching it
+    // outright failed with "TypeError: Failed to fetch", a cross-origin/
+    // unreachable-host failure, not an HTTP error status). Instead just
+    // increments our own "page" query param on the same relative path we
+    // already know works, using "next" only as a boolean "is there more".
+    // Concatenates into the same {status, ok, data: {results}} shape api()
+    // returns, so callers don't need to change beyond swapping which
+    // function they call.
+    function apiAllPages(path) {
+        var results = [];
+        var sep = path.indexOf("?") === -1 ? "?" : "&";
+        function loadPage(page) {
+            var p = page === 1 ? path : path + sep + "page=" + page;
+            return api(p).then(function (res) {
+                if (!res.ok || !res.data) return {status: res.status, ok: res.ok, data: {results: results}};
+                results = results.concat(res.data.results || []);
+                if (res.data.next) return loadPage(page + 1);
+                return {status: res.status, ok: true, data: {results: results}};
+            });
+        }
+        return loadPage(1);
+    }
+
     function pickI18n(v) {
         if (v == null) return "";
         if (typeof v === "string") return v;
@@ -296,7 +325,7 @@
         }
         var seId = currentSubeventId();
         var seatsPromise = window.PretixSeatingRenderer
-            ? api(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
+            ? apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
             : Promise.resolve({ok: true, data: {results: []}});
 
         seatsPromise.then(function (seatsRes) {
@@ -655,7 +684,7 @@
         } else if (seIds.length > 1) {
             seatMapPromise = Promise.resolve({multiDate: true, results: []});
         } else {
-            seatMapPromise = api(seIds.length === 1 ? eventPath("/subevents/" + seIds[0] + "/seatmap/") : eventPath("/seatmap/"))
+            seatMapPromise = apiAllPages(seIds.length === 1 ? eventPath("/subevents/" + seIds[0] + "/seatmap/") : eventPath("/seatmap/"))
                 .then(function (res) {
                     var raw = (res.ok && res.data && res.data.results) || [];
                     return {multiDate: false, results: raw.map(toDrawSeat)};
