@@ -451,7 +451,7 @@
         seatpickWrap.hidden = false;
         seatpickTitle.textContent = "Seats for: " + pickI18n(itemsById[activeSeatItem].name);
         window.PretixSeatingRenderer.drawSeats(svgSell, sellSeats, function (s) {
-            if (cart.some(function (c) { return c.seatGuid === s.guid; })) return "#337ab7";
+            if (cart.some(function (c) { return c.seatGuid === s.guid; })) return window.PretixSeatingRenderer.SELECTED_COLOR;
             return window.PretixSeatingRenderer.seatColor(s);
         }, function (s) {
             var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid; });
