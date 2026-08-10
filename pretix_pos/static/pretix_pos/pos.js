@@ -849,13 +849,15 @@
     function applyPositionSeat(positionId, patchedSeat) {
         var pos = (currentOrder.positions || []).find(function (p) { return p.id === positionId; });
         var oldGuid = pos && pos.seat && pos.seat.seat_guid;
-        if (pos) pos.seat = patchedSeat;
-        if (oldGuid && oldGuid !== patchedSeat.seat_guid) {
+        if (pos) pos.seat = patchedSeat || null;
+        if (oldGuid && oldGuid !== (patchedSeat && patchedSeat.seat_guid)) {
             var oldSeat = orderSeats.find(function (s) { return s.guid === oldGuid; });
             if (oldSeat) oldSeat.status = "free";
         }
-        var newSeat = orderSeats.find(function (s) { return s.guid === patchedSeat.seat_guid; });
-        if (newSeat) newSeat.status = "taken";
+        if (patchedSeat) {
+            var newSeat = orderSeats.find(function (s) { return s.guid === patchedSeat.seat_guid; });
+            if (newSeat) newSeat.status = "taken";
+        }
     }
 
     function renderOrderDetail() {
@@ -922,7 +924,7 @@
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
-            hint.textContent = "Drag a rectangle over free seats to select several at once, then click \"Place selected\". Drag an already-placed seat of this order onto a free seat to move it.";
+            hint.textContent = "This order's own seats are shown with a ring. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions, then click \"Place selected\". Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it; hold Ctrl while dragging to move its whole block of seats together.";
             orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -983,21 +985,37 @@
 
         // Same ring-only, no-fill treatment as everywhere else this "chosen but
         // not yet committed" pattern shows up (pretix_seating's eshop picker and
-        // control assign GUI, and this plugin's own sell/reserve seat picker).
+        // control assign GUI, and this plugin's own sell/reserve seat picker) -
+        // also applied to seats already assigned to this order, so staff can see
+        // at a glance which seats are "theirs" (clickable to unassign, draggable
+        // to move) versus seats simply taken by some other order.
+        function isOwnSeat(s) {
+            return !!ownPositionOfSeat(s);
+        }
+
         function colorFn(s) {
-            return placementPool[s.guid] ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
+            return (placementPool[s.guid] || isOwnSeat(s)) ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
         }
 
         function strokeFn(s) {
-            return placementPool[s.guid] ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
+            return (placementPool[s.guid] || isOwnSeat(s)) ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
         }
 
         function labelColorFn(s) {
-            return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
+            return (placementPool[s.guid] || isOwnSeat(s)) ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
         }
 
         function render() {
             window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn);
+        }
+
+        // The number of positions actually checked to receive a seat - the hard
+        // cap on how many free seats can be gathered into placementPool at once,
+        // so staff can no longer select more seats than the order actually needs
+        // (previously uncapped, silently truncated only once "Place selected"
+        // was clicked, which was confusing).
+        function checkedCount() {
+            return positionListEl.querySelectorAll("input[type=checkbox]:checked").length;
         }
 
         function renderPlaceBtn() {
@@ -1070,9 +1088,19 @@
             drag = null;
 
             if (!d.moved) {
+                // A plain click (no drag) on one of this order's own already-
+                // assigned seats removes it from that position - dragging it
+                // instead moves it (see the d.movePosition branch below).
+                if (d.movePosition) {
+                    unassignSeat(d.movePosition);
+                    return;
+                }
                 if (d.clickSeat && d.clickSeat.status === "free") {
-                    if (placementPool[d.clickSeat.guid]) delete placementPool[d.clickSeat.guid];
-                    else placementPool[d.clickSeat.guid] = d.clickSeat;
+                    if (placementPool[d.clickSeat.guid]) {
+                        delete placementPool[d.clickSeat.guid];
+                    } else if (Object.keys(placementPool).length < checkedCount()) {
+                        placementPool[d.clickSeat.guid] = d.clickSeat;
+                    }
                     render();
                     renderPlaceBtn();
                 }
@@ -1084,7 +1112,11 @@
             if (d.movePosition) {
                 var target = seatAtEvent(e);
                 if (target && target.status === "free") {
-                    movePositionSeat(d.movePosition, target.guid);
+                    if (e.ctrlKey) {
+                        moveBlock(d.clickSeat, target);
+                    } else {
+                        movePositionSeat(d.movePosition, target.guid);
+                    }
                 }
                 return;
             }
@@ -1094,11 +1126,13 @@
                 x0: Math.min(d.startPt.x, pt.x), x1: Math.max(d.startPt.x, pt.x),
                 y0: Math.min(d.startPt.y, pt.y), y1: Math.max(d.startPt.y, pt.y),
             };
+            var cap = checkedCount();
             seats.forEach(function (s) {
                 if (s.status !== "free" || s.x == null || s.y == null) return;
-                if (s.x >= rect.x0 && s.x <= rect.x1 && s.y >= rect.y0 && s.y <= rect.y1) {
-                    placementPool[s.guid] = s;
-                }
+                if (!(s.x >= rect.x0 && s.x <= rect.x1 && s.y >= rect.y0 && s.y <= rect.y1)) return;
+                if (placementPool[s.guid]) return;
+                if (Object.keys(placementPool).length >= cap) return;
+                placementPool[s.guid] = s;
             });
             render();
             renderPlaceBtn();
@@ -1162,6 +1196,120 @@
                 renderPositionList(positionListEl);
                 render();
             });
+        }
+
+        // A plain click on one of this order's own seats removes it - the
+        // OrderPositionChangeSerializer's `seat` field accepts null explicitly
+        // to unassign (confirmed in orderchange.py: it goes through
+        // OrderChangeManager.change_seat(position, None), same as a real move).
+        function unassignSeat(position) {
+            setMsg(msgEl, "Removing seat…", null);
+            api(eventPath("/orderpositions/" + position.id + "/"), {
+                method: "PATCH",
+                body: JSON.stringify({seat: null}),
+            }).then(function (res) {
+                if (!res.ok) {
+                    setMsg(msgEl, describeError(res.data), "error");
+                    return;
+                }
+                setMsg(msgEl, "Seat removed.", "success");
+                applyPositionSeat(position.id, null);
+                renderPositionList(positionListEl);
+                render();
+                renderPlaceBtn();
+            });
+        }
+
+        // Ctrl+drag moves this order's whole block of assigned seats together,
+        // by the same x/y offset as the one seat that was actually dragged.
+        // Every other seat in the block must resolve to a seat at the offset
+        // position that's either free or itself part of the block (about to be
+        // vacated by this same move) - otherwise the whole move is refused
+        // rather than silently moving only some of the seats.
+        function moveBlock(draggedSeat, targetSeat) {
+            var dx = targetSeat.x - draggedSeat.x, dy = targetSeat.y - draggedSeat.y;
+            if (!dx && !dy) return;
+
+            var blockPositions = (currentOrder.positions || []).filter(function (p) {
+                return !p.canceled && p.seat;
+            });
+            var blockGuids = {};
+            blockPositions.forEach(function (p) { blockGuids[p.seat.seat_guid] = true; });
+
+            var TOL = 0.5;
+            var moves = [];
+            var targetGuidsUsed = {};
+            for (var i = 0; i < blockPositions.length; i++) {
+                var pos = blockPositions[i];
+                var seat = seats.find(function (s) { return s.guid === pos.seat.seat_guid; });
+                if (!seat) {
+                    setMsg(msgEl, "Cannot move block: a seat's location is unknown.", "error");
+                    return;
+                }
+                var wantX = seat.x + dx, wantY = seat.y + dy;
+                var dest = seats.find(function (s) {
+                    return Math.abs(s.x - wantX) < TOL && Math.abs(s.y - wantY) < TOL;
+                });
+                if (!dest) {
+                    setMsg(msgEl, "Cannot move block: target position is outside the seating plan.", "error");
+                    return;
+                }
+                if (dest.status !== "free" && !blockGuids[dest.guid]) {
+                    setMsg(msgEl, "Cannot move block: seat at the target position is already taken.", "error");
+                    return;
+                }
+                if (targetGuidsUsed[dest.guid]) {
+                    setMsg(msgEl, "Cannot move block: target seats overlap.", "error");
+                    return;
+                }
+                targetGuidsUsed[dest.guid] = true;
+                moves.push({position: pos, targetGuid: dest.guid});
+            }
+
+            setMsg(msgEl, "Moving " + moves.length + " seat(s) - this is not a single atomic action, a failure partway through leaves it partially done…", null);
+
+            // Clear every seat in the block first, then assign the new ones -
+            // avoids "seat already taken" conflicts when the block shifts onto
+            // its own previously-occupied seats, regardless of move order.
+            var idx = 0;
+            function clearNext() {
+                if (idx >= moves.length) {
+                    idx = 0;
+                    assignNext();
+                    return;
+                }
+                var m = moves[idx];
+                idx += 1;
+                api(eventPath("/orderpositions/" + m.position.id + "/"), {
+                    method: "PATCH",
+                    body: JSON.stringify({seat: null}),
+                }).then(function (res) {
+                    if (res.ok) applyPositionSeat(m.position.id, null);
+                    clearNext();
+                });
+            }
+            function assignNext() {
+                if (idx >= moves.length) {
+                    setMsg(msgEl, "Block moved.", "success");
+                    renderPositionList(positionListEl);
+                    render();
+                    return;
+                }
+                var m = moves[idx];
+                idx += 1;
+                api(eventPath("/orderpositions/" + m.position.id + "/"), {
+                    method: "PATCH",
+                    body: JSON.stringify({seat: m.targetGuid}),
+                }).then(function (res) {
+                    if (res.ok) {
+                        applyPositionSeat(m.position.id, res.data.seat);
+                    } else {
+                        setMsg(msgEl, "Some seats failed to move: " + describeError(res.data), "error");
+                    }
+                    assignNext();
+                });
+            }
+            clearNext();
         }
 
         render();
