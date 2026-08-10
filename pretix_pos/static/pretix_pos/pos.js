@@ -698,6 +698,7 @@
     var searchBtn = document.getElementById("pos-search-btn");
     var searchResultsEl = document.getElementById("pos-search-results");
     var orderDetailEl = document.getElementById("pos-order-detail");
+    var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
 
     function doSearch() {
         var q = searchInput.value.trim();
@@ -803,37 +804,13 @@
         return name;
     }
 
-    function renderOrderDetail() {
-        orderDetailEl.hidden = false;
-        orderDetailEl.innerHTML = "";
-        var order = currentOrder;
-
-        var h = document.createElement("h3");
-        h.textContent = order.code + " — " + order.status;
-        orderDetailEl.appendChild(h);
-
-        var pending = pendingSum(order);
-        var p = document.createElement("p");
-        p.textContent = "Total: " + order.total + (parseFloat(pending) > 0 ? " — pending: " + pending : " — fully paid");
-        orderDetailEl.appendChild(p);
-
-        var positions = (order.positions || []).filter(function (pos) { return !pos.canceled; });
-
-        var seIds = Array.from(new Set(positions.map(function (pos) { return pos.subevent; }).filter(Boolean)));
-        var seatMapPromise;
-        if (!window.PretixSeatingRenderer) {
-            seatMapPromise = Promise.resolve({multiDate: false, results: []});
-        } else if (seIds.length > 1) {
-            seatMapPromise = Promise.resolve({multiDate: true, results: []});
-        } else {
-            seatMapPromise = apiAllPages(seIds.length === 1 ? eventPath("/subevents/" + seIds[0] + "/seatmap/") : eventPath("/seatmap/"))
-                .then(function (res) {
-                    var raw = (res.ok && res.data && res.data.results) || [];
-                    return {multiDate: false, results: raw.map(toDrawSeat)};
-                });
-        }
-
-        var list = document.createElement("div");
+    // (Re)builds the position checkbox/label/seat-badge rows into container from
+    // currentOrder.positions - factored out so a seat placement/move can refresh
+    // just this list in place (see applyPositionSeat()) instead of the whole
+    // order detail having to be refetched and rebuilt from scratch.
+    function renderPositionList(container) {
+        container.innerHTML = "";
+        var positions = (currentOrder.positions || []).filter(function (pos) { return !pos.canceled; });
         positions.forEach(function (pos) {
             var row = document.createElement("div");
             row.className = "pos-position-row";
@@ -858,8 +835,46 @@
             }
             row.appendChild(badge);
 
-            list.appendChild(row);
+            container.appendChild(row);
         });
+    }
+
+    // Applies a successful seat PATCH's result to local state instead of a full
+    // loadOrderDetail() reload - reloading (refetch + tear down and rebuild the
+    // whole seatmap and position list) after every single placement during a
+    // multi-seat editing session was "hodne nepohodlny" (very inconvenient) for
+    // what's really just one seat's status changing. patchedSeat is the updated
+    // position's own `seat` field from the PATCH response (has seat_guid/name/etc,
+    // same shape as everywhere else a seat is represented).
+    function applyPositionSeat(positionId, patchedSeat) {
+        var pos = (currentOrder.positions || []).find(function (p) { return p.id === positionId; });
+        var oldGuid = pos && pos.seat && pos.seat.seat_guid;
+        if (pos) pos.seat = patchedSeat;
+        if (oldGuid && oldGuid !== patchedSeat.seat_guid) {
+            var oldSeat = orderSeats.find(function (s) { return s.guid === oldGuid; });
+            if (oldSeat) oldSeat.status = "free";
+        }
+        var newSeat = orderSeats.find(function (s) { return s.guid === patchedSeat.seat_guid; });
+        if (newSeat) newSeat.status = "taken";
+    }
+
+    function renderOrderDetail() {
+        orderDetailEl.hidden = false;
+        orderDetailEl.innerHTML = "";
+        orderSeatmapWrapEl.innerHTML = "";
+        var order = currentOrder;
+
+        var h = document.createElement("h3");
+        h.textContent = order.code + " — " + order.status;
+        orderDetailEl.appendChild(h);
+
+        var pending = pendingSum(order);
+        var p = document.createElement("p");
+        p.textContent = "Total: " + order.total + (parseFloat(pending) > 0 ? " — pending: " + pending : " — fully paid");
+        orderDetailEl.appendChild(p);
+
+        var list = document.createElement("div");
+        renderPositionList(list);
         orderDetailEl.appendChild(list);
 
         if (order.status === "n") {
@@ -871,37 +886,56 @@
             orderDetailEl.appendChild(payBtn);
         }
 
+        var positions = (order.positions || []).filter(function (pos) { return !pos.canceled; });
+        var seIds = Array.from(new Set(positions.map(function (pos) { return pos.subevent; }).filter(Boolean)));
+        var seatMapPromise;
+        if (!window.PretixSeatingRenderer) {
+            seatMapPromise = Promise.resolve({multiDate: false, results: []});
+        } else if (seIds.length > 1) {
+            seatMapPromise = Promise.resolve({multiDate: true, results: []});
+        } else {
+            seatMapPromise = apiAllPages(seIds.length === 1 ? eventPath("/subevents/" + seIds[0] + "/seatmap/") : eventPath("/seatmap/"))
+                .then(function (res) {
+                    var raw = (res.ok && res.data && res.data.results) || [];
+                    return {multiDate: false, results: raw.map(toDrawSeat)};
+                });
+        }
+
         var placeMsg = document.createElement("div");
         placeMsg.id = "pos-place-msg";
         placeMsg.className = "pos-msg";
 
         seatMapPromise.then(function (info) {
             orderSeats = info.results;
+            orderSeatmapWrapEl.innerHTML = "";
             if (info.multiDate) {
                 var warn = document.createElement("p");
                 warn.className = "pos-hint";
                 warn.textContent = "This order spans multiple dates - seat placement here only covers one date at a time and is not shown.";
-                orderDetailEl.appendChild(warn);
+                orderSeatmapWrapEl.appendChild(warn);
                 return;
             }
-            if (!orderSeats.length) return;
+            if (!orderSeats.length) {
+                orderSeatmapWrapEl.textContent = "This order has no seated positions.";
+                return;
+            }
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
             hint.textContent = "Drag a rectangle over free seats to select several at once, then click \"Place selected\". Drag an already-placed seat of this order onto a free seat to move it.";
-            orderDetailEl.appendChild(hint);
+            orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             svg.id = "pos-svg-order";
             svg.setAttribute("class", "pos-seatmap");
-            orderDetailEl.appendChild(svg);
+            orderSeatmapWrapEl.appendChild(svg);
 
             var placeBtn = document.createElement("button");
             placeBtn.type = "button";
             placeBtn.textContent = "Place selected seats on checked positions";
             placeBtn.style.marginTop = "10px";
-            orderDetailEl.appendChild(placeBtn);
-            orderDetailEl.appendChild(placeMsg);
+            orderSeatmapWrapEl.appendChild(placeBtn);
+            orderSeatmapWrapEl.appendChild(placeMsg);
 
             initOrderSeatMap(svg, placeBtn, placeMsg, list);
         });
@@ -1050,7 +1084,7 @@
             if (d.movePosition) {
                 var target = seatAtEvent(e);
                 if (target && target.status === "free") {
-                    movePositionSeat(d.movePosition, target.guid, msgEl);
+                    movePositionSeat(d.movePosition, target.guid);
                 }
                 return;
             }
@@ -1086,7 +1120,9 @@
                 if (i >= n) {
                     setMsg(msgEl, "Placed " + ok + "/" + n + " seat(s)." + (failed.length ? " Failed: " + failed.join("; ") : ""), failed.length ? "error" : "success");
                     placementPool = {};
-                    loadOrderDetail(currentOrder.code);
+                    renderPositionList(positionListEl);
+                    render();
+                    renderPlaceBtn();
                     return;
                 }
                 var seat = poolSeats[i];
@@ -1096,31 +1132,40 @@
                     method: "PATCH",
                     body: JSON.stringify({seat: seat.guid}),
                 }).then(function (res) {
-                    if (res.ok) ok += 1;
-                    else failed.push("#" + posId + ": " + describeError(res.data));
+                    if (res.ok) {
+                        ok += 1;
+                        applyPositionSeat(posId, res.data.seat);
+                    } else {
+                        failed.push("#" + posId + ": " + describeError(res.data));
+                    }
                     next();
                 });
             }
             next();
         });
 
+        // Nested (rather than a standalone top-level function) so it can update
+        // this map in place after a move instead of the whole order detail
+        // having to be refetched and rebuilt - see applyPositionSeat().
+        function movePositionSeat(position, seatGuid) {
+            setMsg(msgEl, "Moving seat…", null);
+            api(eventPath("/orderpositions/" + position.id + "/"), {
+                method: "PATCH",
+                body: JSON.stringify({seat: seatGuid}),
+            }).then(function (res) {
+                if (!res.ok) {
+                    setMsg(msgEl, describeError(res.data), "error");
+                    return;
+                }
+                setMsg(msgEl, "Seat moved.", "success");
+                applyPositionSeat(position.id, res.data.seat);
+                renderPositionList(positionListEl);
+                render();
+            });
+        }
+
         render();
         renderPlaceBtn();
-    }
-
-    function movePositionSeat(position, seatGuid, msgEl) {
-        setMsg(msgEl, "Moving seat…", null);
-        api(eventPath("/orderpositions/" + position.id + "/"), {
-            method: "PATCH",
-            body: JSON.stringify({seat: seatGuid}),
-        }).then(function (res) {
-            if (!res.ok) {
-                setMsg(msgEl, describeError(res.data), "error");
-                return;
-            }
-            setMsg(msgEl, "Seat moved.", "success");
-            loadOrderDetail(currentOrder.code);
-        });
     }
 
     // -------------------------------------------------------------------- boot

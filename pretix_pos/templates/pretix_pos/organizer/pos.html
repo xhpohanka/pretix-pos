@@ -84,12 +84,20 @@
                 </div>
 
                 <div id="pos-tab-find" class="pos-tab-panel" hidden>
-                    <div class="pos-search-bar">
-                        <input type="text" id="pos-search" placeholder="{% trans "Order code, name, e-mail…" %}">
-                        <button id="pos-search-btn" type="button">{% trans "Search" %}</button>
+                    <div class="pos-columns">
+                        <div class="pos-col pos-col-items">
+                            <h2>{% trans "Seating plan" %}</h2>
+                            <div id="pos-order-seatmap-wrap" class="pos-msg">{% trans "Select an order to place or move seats." %}</div>
+                        </div>
+                        <div class="pos-col pos-col-cart">
+                            <div class="pos-search-bar">
+                                <input type="text" id="pos-search" placeholder="{% trans "Order code, name, e-mail…" %}">
+                                <button id="pos-search-btn" type="button">{% trans "Search" %}</button>
+                            </div>
+                            <div id="pos-search-results"></div>
+                            <div id="pos-order-detail" hidden></div>
+                        </div>
                     </div>
-                    <div id="pos-search-results"></div>
-                    <div id="pos-order-detail" hidden></div>
                 </div>
             </section>
 
