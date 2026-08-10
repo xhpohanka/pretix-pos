@@ -8,7 +8,6 @@
     var ORGANIZER = root.dataset.organizer;
     var SALES_CHANNEL = root.dataset.salesChannel;
     var STORAGE_KEY = "pretix_pos_state:" + ORGANIZER;
-    var POOL_COLOR = "#9b59b6";
     var DRAG_THRESHOLD = 4;
 
     var state = loadState();
@@ -237,11 +236,19 @@
             Object.keys(panels).forEach(function (k) {
                 panels[k].hidden = k !== btn.dataset.tab;
             });
+            if (btn.dataset.tab === "find" && !searchInput.value.trim()) {
+                loadDefaultOrderList();
+            }
         });
     });
 
     function currentSubeventId() {
         return state.event.hasSubevents ? (subeventSelect.value || null) : null;
+    }
+
+    function subeventLabel(id) {
+        var opt = subeventSelect.querySelector('option[value="' + id + '"]');
+        return opt ? opt.textContent : ("#" + id);
     }
 
     function eventPath(suffix) {
@@ -253,6 +260,14 @@
         headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
         btnChangeEvent.hidden = false;
         btnUnpair.hidden = false;
+
+        // A cart can span several dates of the same event (see subeventSelect's
+        // change handler below) but never several events - this is the one
+        // place a genuinely fresh session starts, whether from initial page
+        // load or from "Change event".
+        cart = [];
+        activeSeatItem = null;
+        renderCart();
 
         loadItemsIndex().then(function () {
             if (state.event.hasSubevents) {
@@ -291,15 +306,18 @@
     }
 
     subeventSelect.addEventListener("change", function () {
-        cart = [];
+        // Switching the date must NOT drop whatever is already in the cart for
+        // other dates - only the in-progress seat-picking UI (tied to this one
+        // date's seatmap) needs resetting. Each cart entry carries its own
+        // subeventId (see adjustQty/renderSeatpick), so buildPositions() below
+        // still submits everything to the right date regardless of which date
+        // is currently selected.
         activeSeatItem = null;
         loadForCurrentContext();
     });
 
     function loadForCurrentContext() {
-        cart = [];
         activeSeatItem = null;
-        renderCart();
         loadSellItems();
     }
 
@@ -377,8 +395,15 @@
         renderSeatpick();
     }
 
+    // Scoped to the currently-selected date - a cart can hold items for other
+    // dates too (see subeventSelect's change handler), but the quantity
+    // stepper shown next to each item must only reflect what's already queued
+    // for the date currently on screen, or it would look wrong/confusing.
     function cartCountFor(itemId, variationId) {
-        return cart.filter(function (c) { return c.itemId === itemId && c.variationId === (variationId || null) && !c.seatGuid; }).length;
+        var seId = currentSubeventId();
+        return cart.filter(function (c) {
+            return c.itemId === itemId && c.variationId === (variationId || null) && !c.seatGuid && c.subeventId === seId;
+        }).length;
     }
 
     function renderSellItemRow(item) {
@@ -393,7 +418,8 @@
 
             var btn = document.createElement("button");
             btn.type = "button";
-            var seatCount = cart.filter(function (c) { return c.itemId === item.id && c.seatGuid; }).length;
+            var seId = currentSubeventId();
+            var seatCount = cart.filter(function (c) { return c.itemId === item.id && c.seatGuid && c.subeventId === seId; }).length;
             btn.textContent = (activeSeatItem === item.id ? "Picking seats…" : "Pick seats") + (seatCount ? " (" + seatCount + ")" : "");
             if (activeSeatItem === item.id) btn.className = "pos-btn-primary";
             btn.addEventListener("click", function () {
@@ -461,11 +487,12 @@
     }
 
     function adjustQty(itemId, variationId, price, delta) {
+        var seId = currentSubeventId();
         if (delta > 0) {
-            cart.push({itemId: itemId, variationId: variationId, seatGuid: null, price: price});
+            cart.push({itemId: itemId, variationId: variationId, seatGuid: null, price: price, subeventId: seId});
         } else {
             var idx = cart.findIndex(function (c) {
-                return c.itemId === itemId && c.variationId === (variationId || null) && !c.seatGuid;
+                return c.itemId === itemId && c.variationId === (variationId || null) && !c.seatGuid && c.subeventId === seId;
             });
             if (idx >= 0) cart.splice(idx, 1);
         }
@@ -480,9 +507,15 @@
         }
         seatpickWrap.hidden = false;
         seatpickTitle.textContent = "Seats for: " + pickI18n(itemsById[activeSeatItem].name);
+        // Same ring-only, no-fill treatment as pretix_seating's eshop picker for
+        // "in cart, not yet submitted" - a solid fixed color could collide with
+        // some category's own color, same reason as everywhere else this pattern
+        // is used.
+        function isCartSeat(s) {
+            return cart.some(function (c) { return c.seatGuid === s.guid; });
+        }
         window.PretixSeatingRenderer.drawSeats(svgSell, sellSeats, function (s) {
-            if (cart.some(function (c) { return c.seatGuid === s.guid; })) return window.PretixSeatingRenderer.SELECTED_COLOR;
-            return window.PretixSeatingRenderer.seatColor(s);
+            return isCartSeat(s) ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
         }, function (s) {
             var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid; });
             if (idx >= 0) {
@@ -491,11 +524,18 @@
                 if (s.status !== "free") return;
                 if (s.product_id != null && s.product_id !== activeSeatItem) return;
                 var label = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") || s.guid;
-                cart.push({itemId: activeSeatItem, variationId: null, seatGuid: s.guid, price: itemsById[activeSeatItem].default_price, seatLabel: label});
+                cart.push({
+                    itemId: activeSeatItem, variationId: null, seatGuid: s.guid,
+                    price: itemsById[activeSeatItem].default_price, seatLabel: label, subeventId: currentSubeventId(),
+                });
             }
             renderSellItems();
             renderCart();
-        }, null, "pointer");
+        }, null, "pointer", function (s) {
+            return isCartSeat(s) ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
+        }, function (s) {
+            return isCartSeat(s) ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
+        });
     }
 
     function renderCart() {
@@ -517,6 +557,10 @@
                 if (v) name += " (" + pickI18n(v.value) + ")";
             }
             if (c.seatGuid) name += " — " + (c.seatLabel || c.seatGuid);
+            // A cart can now span several dates (see subeventSelect's change
+            // handler) - each line needs to say which one it's for, since that's
+            // no longer implied by "whichever date happens to be on screen".
+            if (state.event.hasSubevents) name += " [" + subeventLabel(c.subeventId) + "]";
             if (c.price != null) total += parseFloat(c.price) || 0;
             var li = document.createElement("li");
             var span = document.createElement("span");
@@ -543,11 +587,14 @@
     }
 
     function buildPositions() {
-        var seId = currentSubeventId();
+        // Each line carries its own subeventId (set when added, see adjustQty/
+        // renderSeatpick) - a cart can span several dates of this event at
+        // once, so this must NOT fall back to "whichever date is on screen
+        // right now" for every line.
         return cart.map(function (c) {
             var p = {item: c.itemId};
             if (c.variationId) p.variation = c.variationId;
-            if (seId) p.subevent = seId;
+            if (c.subeventId) p.subevent = c.subeventId;
             if (c.seatGuid) p.seat = c.seatGuid;
             return p;
         });
@@ -591,7 +638,10 @@
 
     function doSearch() {
         var q = searchInput.value.trim();
-        if (!q) return;
+        if (!q) {
+            loadDefaultOrderList();
+            return;
+        }
         searchResultsEl.textContent = "Searching…";
         api(eventPath("/orders/?search=" + encodeURIComponent(q) + "&ordering=-datetime")).then(function (res) {
             if (!res.ok) {
@@ -606,6 +656,35 @@
     searchInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
+
+    // "Not yet seated" is approximated as "has a non-canceled position without
+    // a seat" - there's no direct API filter for "this position's item
+    // actually requires a seat", so this can under/over-flag a handful of
+    // plain (never-seated) items too, but for this deployment almost every
+    // sold item is seated, making it a reasonable proxy without pulling in
+    // a whole extra seatmap fetch just to sort a browsing list.
+    function orderSortKey(o) {
+        var positions = (o.positions || []).filter(function (p) { return !p.canceled; });
+        var needsSeat = positions.some(function (p) { return !p.seat; });
+        var unpaid = o.status !== "p";
+        return (needsSeat ? 0 : 2) + (unpaid ? 0 : 1);
+    }
+
+    // Shown by default on the "Find order" tab (before any search) so staff
+    // can browse rather than always having to know a code/name/e-mail
+    // upfront - sorted with whatever most likely still needs attention first.
+    function loadDefaultOrderList() {
+        searchResultsEl.textContent = "Loading…";
+        api(eventPath("/orders/?ordering=-datetime")).then(function (res) {
+            if (!res.ok) {
+                searchResultsEl.textContent = describeError(res.data);
+                return;
+            }
+            var orders = ((res.data && res.data.results) || []).slice();
+            orders.sort(function (a, b) { return orderSortKey(a) - orderSortKey(b); });
+            renderSearchResults(orders);
+        });
+    }
 
     function renderSearchResults(orders) {
         searchResultsEl.innerHTML = "";
@@ -805,13 +884,23 @@
             }) || null;
         }
 
+        // Same ring-only, no-fill treatment as everywhere else this "chosen but
+        // not yet committed" pattern shows up (pretix_seating's eshop picker and
+        // control assign GUI, and this plugin's own sell/reserve seat picker).
         function colorFn(s) {
-            if (placementPool[s.guid]) return POOL_COLOR;
-            return window.PretixSeatingRenderer.seatColor(s);
+            return placementPool[s.guid] ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
+        }
+
+        function strokeFn(s) {
+            return placementPool[s.guid] ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
+        }
+
+        function labelColorFn(s) {
+            return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
         }
 
         function render() {
-            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer");
+            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn);
         }
 
         function renderPlaceBtn() {

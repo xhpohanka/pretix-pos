@@ -68,7 +68,7 @@ button.pos-btn-link {
 button.pos-btn-link:hover { color: #fff; }
 
 #pos-main-area {
-    max-width: 1100px;
+    max-width: 1600px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -126,10 +126,22 @@ button.pos-tab.active {
 }
 
 .pos-col {
-    flex: 1 1 360px;
     background: #fff;
     border-radius: 6px;
     padding: 16px;
+}
+
+/* The items/seatmap column should get most of the room - same idea as the
+   eshop picker's map-grows/sidebar-fixed layout - while the cart column
+   only needs enough width for its own controls. */
+.pos-col-items {
+    flex: 3 1 600px;
+    min-width: 320px;
+}
+
+.pos-col-cart {
+    flex: 1 1 320px;
+    max-width: 380px;
 }
 
 .pos-item-row {
@@ -168,7 +180,7 @@ button.pos-tab.active {
     display: block;
     width: 100%;
     height: auto;
-    max-height: 420px;
+    max-height: 70vh;
     background: #fafafa;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -180,6 +192,12 @@ button.pos-tab.active {
 
 .pos-search-bar { display: flex; gap: 8px; max-width: 500px; }
 .pos-search-bar input { flex: 1; }
+
+#pos-search-results {
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-top: 4px;
+}
 
 .pos-search-result {
     padding: 10px 12px;
