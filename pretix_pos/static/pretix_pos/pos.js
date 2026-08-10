@@ -19,6 +19,7 @@
     var currentOrder = null;
     var placementPool = {}; // seat_guid -> seat, pending bulk placement on the loaded order
     var orderSeats = [];
+    var subeventPriceOverrides = {}; // subeventId -> {items: {itemId: price}, variations: {variationId: price}}
 
     function loadState() {
         try {
@@ -251,6 +252,24 @@
         return opt ? opt.textContent : ("#" + id);
     }
 
+    // The price actually charged for an item/variation on a given date - a
+    // date can override the base default_price (see loadSubevents()), so the
+    // cart's displayed total can be shown as a real final amount instead of
+    // hedging with "estimated" - POS doesn't support vouchers/memberships/
+    // bundles at all (see the v1 limitations note), which are the only other
+    // things that could otherwise make the server-computed price differ.
+    function priceFor(itemId, variationId, subeventId) {
+        var it = itemsById[itemId];
+        var overrides = subeventId != null && subeventPriceOverrides[subeventId];
+        if (variationId) {
+            if (overrides && overrides.variations[variationId] != null) return overrides.variations[variationId];
+            var v = it && (it.variations || []).find(function (vv) { return vv.id === variationId; });
+            return v && v.default_price != null ? v.default_price : (it ? it.default_price : null);
+        }
+        if (overrides && overrides.items[itemId] != null) return overrides.items[itemId];
+        return it ? it.default_price : null;
+    }
+
     function eventPath(suffix) {
         return "/organizers/" + ORGANIZER + "/events/" + state.event.slug + suffix;
     }
@@ -295,11 +314,24 @@
         subeventSelect.innerHTML = "";
         api(eventPath("/subevents/?active=true&ordering=date_from")).then(function (res) {
             var subs = (res.ok && res.data && res.data.results) || [];
+            subeventPriceOverrides = {};
             subs.forEach(function (se) {
                 var opt = document.createElement("option");
                 opt.value = se.id;
                 opt.textContent = pickI18n(se.name) + " — " + new Date(se.date_from).toLocaleString();
                 subeventSelect.appendChild(opt);
+
+                // A date can override an item's/variation's price from the base
+                // default_price - needed to show a genuinely final total instead
+                // of hedging with "estimated" (see priceFor()).
+                var items = {}, variations = {};
+                (se.item_price_overrides || []).forEach(function (o) {
+                    if (o.price != null) items[o.item] = o.price;
+                });
+                (se.variation_price_overrides || []).forEach(function (o) {
+                    if (o.price != null) variations[o.variation] = o.price;
+                });
+                subeventPriceOverrides[se.id] = {items: items, variations: variations};
             });
             loadForCurrentContext();
         });
@@ -356,14 +388,23 @@
                 return {
                     id: it.id,
                     name: pickI18n(it.name),
-                    price: it.default_price,
+                    price: priceFor(it.id, null, seId),
                     hasVariations: it.has_variations,
                     variations: (it.variations || []).filter(function (v) { return v.active; }).map(function (v) {
-                        return {id: v.id, value: pickI18n(v.value), price: v.default_price != null ? v.default_price : it.default_price};
+                        return {id: v.id, value: pickI18n(v.value), price: priceFor(it.id, v.id, seId)};
                     }),
                     needsSeat: sellSeats.some(function (s) { return s.product_id === it.id; }),
                 };
             });
+            // Auto-open seat picking for the first seated item instead of
+            // requiring an extra "Pick seats" click first - there's nothing to
+            // disambiguate for the common case of one seated item, and even
+            // with several, showing the map right away (defaulting to the
+            // first) is still one click less than before.
+            if (activeSeatItem == null || !sellItems.some(function (it) { return it.id === activeSeatItem && it.needsSeat; })) {
+                var firstSeated = sellItems.find(function (it) { return it.needsSeat; });
+                activeSeatItem = firstSeated ? firstSeated.id : null;
+            }
             renderSellItems();
         });
     }
@@ -416,17 +457,28 @@
             label.textContent = item.name + " (" + fmtMoney(item.price) + ") — seated";
             row.appendChild(label);
 
-            var btn = document.createElement("button");
-            btn.type = "button";
             var seId = currentSubeventId();
             var seatCount = cart.filter(function (c) { return c.itemId === item.id && c.seatGuid && c.subeventId === seId; }).length;
-            btn.textContent = (activeSeatItem === item.id ? "Picking seats…" : "Pick seats") + (seatCount ? " (" + seatCount + ")" : "");
-            if (activeSeatItem === item.id) btn.className = "pos-btn-primary";
-            btn.addEventListener("click", function () {
-                activeSeatItem = activeSeatItem === item.id ? null : item.id;
-                renderSellItems();
-            });
-            row.appendChild(btn);
+            if (activeSeatItem === item.id) {
+                // The map below is already showing this item's seats - nothing
+                // to click here, just a status readout.
+                var status = document.createElement("span");
+                status.className = "pos-item-price";
+                status.textContent = seatCount ? seatCount + " selected" : "Pick seats below";
+                row.appendChild(status);
+            } else {
+                // Only reachable when more than one seated item exists - the map
+                // auto-opens for the first one, this just lets staff switch which
+                // item a click on the (shared) seatmap adds to.
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = "Switch to this item" + (seatCount ? " (" + seatCount + ")" : "");
+                btn.addEventListener("click", function () {
+                    activeSeatItem = item.id;
+                    renderSellItems();
+                });
+                row.appendChild(btn);
+            }
             return row;
         }
 
@@ -507,17 +559,24 @@
         }
         seatpickWrap.hidden = false;
         seatpickTitle.textContent = "Seats for: " + pickI18n(itemsById[activeSeatItem].name);
+        var seId = currentSubeventId();
         // Same ring-only, no-fill treatment as pretix_seating's eshop picker for
         // "in cart, not yet submitted" - a solid fixed color could collide with
         // some category's own color, same reason as everywhere else this pattern
-        // is used.
+        // is used. Matching by seatGuid alone is not enough once a cart can span
+        // several dates (see subeventSelect's change handler): dates that share
+        // the same underlying SeatingPlan reuse the exact same guid per seat
+        // position, so a seat picked for one date would incorrectly show as
+        // already-selected - and clicking it would remove *that other date's*
+        // cart line instead of adding this one - on every other date using the
+        // same plan. subeventId must match too.
         function isCartSeat(s) {
-            return cart.some(function (c) { return c.seatGuid === s.guid; });
+            return cart.some(function (c) { return c.seatGuid === s.guid && c.subeventId === seId; });
         }
         window.PretixSeatingRenderer.drawSeats(svgSell, sellSeats, function (s) {
             return isCartSeat(s) ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
         }, function (s) {
-            var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid; });
+            var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid && c.subeventId === seId; });
             if (idx >= 0) {
                 cart.splice(idx, 1);
             } else {
@@ -526,7 +585,7 @@
                 var label = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") || s.guid;
                 cart.push({
                     itemId: activeSeatItem, variationId: null, seatGuid: s.guid,
-                    price: itemsById[activeSeatItem].default_price, seatLabel: label, subeventId: currentSubeventId(),
+                    price: priceFor(activeSeatItem, null, seId), seatLabel: label, subeventId: seId,
                 });
             }
             renderSellItems();
@@ -580,7 +639,11 @@
         cartEl.appendChild(ul);
         var totalDiv = document.createElement("div");
         totalDiv.className = "pos-cart-total";
-        totalDiv.textContent = "Estimated total: " + total.toFixed(2) + " (final price computed at checkout)";
+        // Genuinely the final amount, not a hedge - priceFor() already accounts
+        // for the only thing that could otherwise make this diverge from what
+        // the server charges (per-date price overrides), and POS doesn't
+        // support vouchers/memberships/bundles that could shift it further.
+        totalDiv.textContent = "Total: " + total.toFixed(2);
         cartEl.appendChild(totalDiv);
         btnReserve.disabled = false;
         btnSell.disabled = false;
