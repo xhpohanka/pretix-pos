@@ -1,7 +1,15 @@
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils.translation import gettext_lazy as _
+from pretix.base.signals import register_sales_channel_types
 from pretix.control.signals import nav_organizer
+
+from .channels import POSSalesChannelType
+
+
+@receiver(register_sales_channel_types, dispatch_uid="pretix_pos_register_sales_channel_type")
+def register_pos_sales_channel_type(sender, **kwargs):
+    return POSSalesChannelType()
 
 
 @receiver(nav_organizer, dispatch_uid="pretix_pos_nav_organizer")

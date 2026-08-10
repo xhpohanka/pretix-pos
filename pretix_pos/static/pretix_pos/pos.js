@@ -6,6 +6,7 @@
 
     var API_BASE = root.dataset.apiBase;
     var ORGANIZER = root.dataset.organizer;
+    var SALES_CHANNEL = root.dataset.salesChannel;
     var STORAGE_KEY = "pretix_pos_state:" + ORGANIZER;
     var POOL_COLOR = "#9b59b6";
     var DRAG_THRESHOLD = 4;
@@ -530,6 +531,7 @@
         btnSell.disabled = true;
         setMsg(sellMsg, "Submitting…", null);
         var body = {status: mode === "sell" ? "p" : "n", positions: positions};
+        if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         var email = emailInput.value.trim();
         if (email) body.email = email;
         if (mode === "sell") body.payment_provider = "boxoffice";
