@@ -331,6 +331,7 @@
             guid: s.seat_guid, x: s.x, y: s.y, zone: s.zone_name,
             row_label: s.row_label, seat_label: s.seat_label,
             status: s.status, product_id: s.product,
+            category_color: s.category_color, radius: s.radius,
         };
     }
 
@@ -451,7 +452,7 @@
         seatpickTitle.textContent = "Seats for: " + pickI18n(itemsById[activeSeatItem].name);
         window.PretixSeatingRenderer.drawSeats(svgSell, sellSeats, function (s) {
             if (cart.some(function (c) { return c.seatGuid === s.guid; })) return "#337ab7";
-            return {free: "#5cb85c", taken: "#d9534f", held: "#f0ad4e", blocked: "#777777"}[s.status] || "#999";
+            return window.PretixSeatingRenderer.seatColor(s);
         }, function (s) {
             var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid; });
             if (idx >= 0) {
@@ -775,7 +776,7 @@
 
         function colorFn(s) {
             if (placementPool[s.guid]) return POOL_COLOR;
-            return {free: "#5cb85c", taken: "#d9534f", held: "#f0ad4e", blocked: "#777777"}[s.status] || "#999";
+            return window.PretixSeatingRenderer.seatColor(s);
         }
 
         function render() {
