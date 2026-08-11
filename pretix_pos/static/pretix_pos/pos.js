@@ -443,6 +443,7 @@
             row_label: s.row_label, seat_label: s.seat_label,
             status: s.status, product_id: s.product,
             category_color: s.category_color, radius: s.radius,
+            order_code: s.order_code,
         };
     }
 
@@ -743,15 +744,19 @@
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
 
-    // "Not yet seated" is approximated as "has a non-canceled position without
-    // a seat" - there's no direct API filter for "this position's item
+    // "Seated" is approximated as "every non-canceled position already has a
+    // seat" - there's no direct API filter for "this position's item
     // actually requires a seat", so this can under/over-flag a handful of
     // plain (never-seated) items too, but for this deployment almost every
     // sold item is seated, making it a reasonable proxy without pulling in
-    // a whole extra seatmap fetch just to sort a browsing list.
-    function orderSortKey(o) {
+    // a whole extra seatmap fetch just to sort/color a browsing list.
+    function orderIsSeated(o) {
         var positions = (o.positions || []).filter(function (p) { return !p.canceled; });
-        var needsSeat = positions.some(function (p) { return !p.seat; });
+        return positions.every(function (p) { return !!p.seat; });
+    }
+
+    function orderSortKey(o) {
+        var needsSeat = !orderIsSeated(o);
         var unpaid = o.status !== "p";
         return (needsSeat ? 0 : 2) + (unpaid ? 0 : 1);
     }
@@ -780,7 +785,13 @@
         }
         orders.forEach(function (o) {
             var div = document.createElement("div");
-            div.className = "pos-search-result";
+            // Seated+paid (green) / seated+unpaid (yellow) / not yet seated
+            // (plain/white) - staff's main question at a glance is "does this
+            // still need seats", with payment status as a secondary cue only
+            // once seating is already done.
+            var seated = orderIsSeated(o);
+            div.className = "pos-search-result" +
+                (seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = pendingSum(o);
@@ -946,7 +957,7 @@
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
-            hint.textContent = "This order's own seats are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\". Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together.";
+            hint.textContent = "This order's own seats are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order.";
             orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1046,8 +1057,19 @@
             return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
         }
 
+        // Lets staff see which order a seat they don't recognize belongs to
+        // without leaving the map - order_code comes from the seatmap API
+        // (added specifically for this), present whenever a non-canceled
+        // pending/paid order holds the seat (so also for this order's own
+        // seats, which is harmless/informative rather than confusing).
+        function titleFn(s) {
+            var base = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") +
+                " (" + s.guid + ") — " + s.status;
+            return s.order_code ? (base + " — Order " + s.order_code) : base;
+        }
+
         function render() {
-            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn);
+            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn, titleFn);
         }
 
         // The number of positions actually checked to receive a seat - the hard
@@ -1154,6 +1176,22 @@
             }
         });
 
+        // Double-clicking a seat that belongs to some *other* order jumps
+        // straight to that order, instead of making staff go back to search
+        // and type/remember its code - the two single clicks that make up the
+        // double-click already no-op harmlessly for a seat like this (neither
+        // the free-seat pool toggle nor the own-seat unassign branch applies).
+        // Deliberately excludes this order's own seats - those already have a
+        // real, different action on a single click (unassign), so a double-
+        // click there just means "unassign, then reload the same order",
+        // which would be a confusing surprise rather than a shortcut.
+        svg.addEventListener("dblclick", function (e) {
+            var seat = seatAtEvent(e);
+            if (!seat || seat.status === "free" || !seat.order_code) return;
+            if (ownPositionOfSeat(seat)) return;
+            loadOrderDetail(seat.order_code);
+        });
+
         seatMapMouseUpHandler = function (e) {
             if (!drag || !svg.isConnected) { drag = null; return; }
             var d = drag;
@@ -1173,6 +1211,19 @@
                     } else if (Object.keys(placementPool).length < checkedCount()) {
                         placementPool[d.clickSeat.guid] = d.clickSeat;
                     }
+                    render();
+                    renderPlaceBtn();
+                    return;
+                }
+                // A plain click that didn't land on any seat at all - clears
+                // whatever's pending in the placement pool, so staff have an
+                // easy way out of a selection without having to click every
+                // pooled seat again individually. A *drag* starting from empty
+                // space is the rubber-band multi-select (the d.moved branch
+                // below) and is unaffected by this - only a non-dragging click
+                // clears.
+                if (!d.clickSeat && Object.keys(placementPool).length) {
+                    placementPool = {};
                     render();
                     renderPlaceBtn();
                 }
