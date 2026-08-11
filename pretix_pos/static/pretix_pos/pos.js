@@ -924,7 +924,7 @@
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
-            hint.textContent = "This order's own seats are shown with a ring. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions, then click \"Place selected\". Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it; hold Ctrl while dragging to move its whole block of seats together.";
+            hint.textContent = "This order's own seats are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\". Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together.";
             orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -983,26 +983,45 @@
             }) || null;
         }
 
-        // Same ring-only, no-fill treatment as everywhere else this "chosen but
-        // not yet committed" pattern shows up (pretix_seating's eshop picker and
-        // control assign GUI, and this plugin's own sell/reserve seat picker) -
-        // also applied to seats already assigned to this order, so staff can see
-        // at a glance which seats are "theirs" (clickable to unassign, draggable
-        // to move) versus seats simply taken by some other order.
+        // Every seat currently assigned to this order - used both for the
+        // Ctrl+drag block-move preview (see updateGhosts()) and to know which
+        // seats moveBlock() itself needs to move.
+        function ownSeats() {
+            return (currentOrder.positions || [])
+                .filter(function (p) { return !p.canceled && p.seat; })
+                .map(function (p) { return seats.find(function (s) { return s.guid === p.seat.seat_guid; }); })
+                .filter(Boolean);
+        }
+
+        // Two distinct "yours" states, same split as the eshop picker's own
+        // isSelected/mine (see initPick in seatmap.js): a pool seat is only
+        // *staged* - it still needs "Place selected" clicked to actually take
+        // effect - so it keeps the ring-only, no-fill "chosen but not committed"
+        // treatment. A seat already assigned to this order is already real, so
+        // it gets pretix_seating's MINE_COLOR (solid, muted fill+ring) instead -
+        // otherwise the two looked identical and staff couldn't tell "about to
+        // place" from "already placed" without checking the position list.
         function isOwnSeat(s) {
             return !!ownPositionOfSeat(s);
         }
 
         function colorFn(s) {
-            return (placementPool[s.guid] || isOwnSeat(s)) ? "transparent" : window.PretixSeatingRenderer.seatColor(s);
+            if (placementPool[s.guid]) return "transparent";
+            if (isOwnSeat(s)) return window.PretixSeatingRenderer.MINE_COLOR;
+            return window.PretixSeatingRenderer.seatColor(s);
         }
 
         function strokeFn(s) {
-            return (placementPool[s.guid] || isOwnSeat(s)) ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
+            if (placementPool[s.guid]) return {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3};
+            if (isOwnSeat(s)) return {color: window.PretixSeatingRenderer.MINE_COLOR, width: 3};
+            return null;
         }
 
         function labelColorFn(s) {
-            return (placementPool[s.guid] || isOwnSeat(s)) ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
+            // Only the transparent-fill "pool" state needs a label color override
+            // (white-on-transparent is invisible) - MINE_COLOR's fill is solid, so
+            // the default white seat-number label already reads fine on it.
+            return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
         }
 
         function render() {
@@ -1060,6 +1079,32 @@
             r.setAttribute("height", y1 - y0);
         }
 
+        // Translucent preview of where a seat-move drag would land, so staff
+        // don't have to drop first to see the result - just the one dragged
+        // seat normally, or the whole block (see ownSeats()) while Ctrl is
+        // held, matching whichever action mouseup would actually take.
+        // Cleaned up at mouseup by removing drag.ghostEls directly (drag is
+        // already nulled out to `d` by then, see seatMapMouseUpHandler).
+        function updateGhosts(pt, ctrlHeld) {
+            var dx = pt.x - drag.startPt.x, dy = pt.y - drag.startPt.y;
+            var sourceSeats = ctrlHeld ? ownSeats() : [drag.clickSeat];
+            while (drag.ghostEls.length < sourceSeats.length) {
+                var c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                c.setAttribute("class", "pos-drag-ghost");
+                c.setAttribute("fill", window.PretixSeatingRenderer.MINE_COLOR);
+                svg.appendChild(c);
+                drag.ghostEls.push(c);
+            }
+            while (drag.ghostEls.length > sourceSeats.length) {
+                drag.ghostEls.pop().remove();
+            }
+            sourceSeats.forEach(function (s, i) {
+                drag.ghostEls[i].setAttribute("cx", s.x + dx);
+                drag.ghostEls[i].setAttribute("cy", s.y + dy);
+                drag.ghostEls[i].setAttribute("r", s.radius || 10);
+            });
+        }
+
         svg.addEventListener("mousedown", function (e) {
             if (e.button !== 0) return;
             var seat = seatAtEvent(e);
@@ -1069,6 +1114,7 @@
                 clickSeat: seat,
                 movePosition: seat ? ownPositionOfSeat(seat) : null,
                 rectEl: null,
+                ghostEls: [],
             };
             e.preventDefault();
         });
@@ -1079,7 +1125,11 @@
             var dx = pt.x - drag.startPt.x, dy = pt.y - drag.startPt.y;
             if (!drag.moved && Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
             drag.moved = true;
-            if (!drag.movePosition) updateRubberRect(pt);
+            if (drag.movePosition) {
+                updateGhosts(pt, e.ctrlKey);
+            } else {
+                updateRubberRect(pt);
+            }
         });
 
         seatMapMouseUpHandler = function (e) {
@@ -1108,6 +1158,7 @@
             }
 
             if (d.rectEl) d.rectEl.remove();
+            d.ghostEls.forEach(function (el) { el.remove(); });
 
             if (d.movePosition) {
                 var target = seatAtEvent(e);

@@ -242,3 +242,8 @@ button.pos-tab.active {
     stroke: #337ab7;
     stroke-width: 1;
 }
+
+.pos-drag-ghost {
+    opacity: 0.55;
+    pointer-events: none;
+}
