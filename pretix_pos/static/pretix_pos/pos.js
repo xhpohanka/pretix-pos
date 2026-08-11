@@ -1073,6 +1073,14 @@
                 return;
             }
             loadOrderDetail(order.code);
+            // loadOrderDetail() only refreshes the right-hand order detail
+            // panel - the search-results list on the left still shows this
+            // order with its old (pre-payment) status/color/sort position
+            // otherwise, since it was rendered from a snapshot fetched
+            // before this payment. Re-runs whatever's currently shown
+            // (default browse list or an active search), same as any other
+            // trigger for that list.
+            doSearch();
         });
     }
 
