@@ -74,6 +74,9 @@
                             <div id="pos-cart" class="pos-msg">{% trans "Empty." %}</div>
                             <label for="pos-email">{% trans "Customer e-mail" %} ({% trans "optional" %})</label>
                             <input type="email" id="pos-email">
+                            <label for="pos-name">{% trans "Customer name" %} ({% trans "optional" %})</label>
+                            <input type="text" id="pos-name">
+                            <p class="pos-hint">{% trans "Reserving requires an e-mail or a name, so the order can be found again later - selling now (cash) doesn't." %}</p>
                             <div class="pos-actions">
                                 <button id="pos-btn-reserve" type="button" disabled>{% trans "Reserve" %}</button>
                                 <button id="pos-btn-sell" type="button" class="pos-btn-primary" disabled>{% trans "Sell now (cash)" %}</button>

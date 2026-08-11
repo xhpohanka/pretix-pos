@@ -434,6 +434,7 @@
     var svgSell = document.getElementById("pos-svg-sell");
     var cartEl = document.getElementById("pos-cart");
     var emailInput = document.getElementById("pos-email");
+    var nameInput = document.getElementById("pos-name");
     var btnReserve = document.getElementById("pos-btn-reserve");
     var btnSell = document.getElementById("pos-btn-sell");
     var sellMsg = document.getElementById("pos-sell-msg");
@@ -765,12 +766,30 @@
     function submitOrder(mode) {
         var positions = buildPositions();
         if (!positions.length) return;
+        var email = emailInput.value.trim();
+        var name = nameInput.value.trim();
+        // A cash sale is done and paid for on the spot - nobody needs to find
+        // it again. A reservation stays unpaid until the customer comes back,
+        // so *something* has to identify whose it is - otherwise an older
+        // customer without (or unwilling to give) an e-mail would get a
+        // reservation nobody could ever match back to them.
+        if (mode === "reserve" && !email && !name) {
+            setMsg(sellMsg, "Enter an e-mail or a name before reserving - otherwise there's no way to find this order again later.", "error");
+            return;
+        }
+        if (name) {
+            // Applied to every position, not per-attendee - for a walk-up POS
+            // sale this is "whose reservation is this", not per-ticket
+            // naming. attendee_name_cached (not invoice_address, which would
+            // need a full billing address) is exactly what Find order's
+            // search already matches against (core's OrderFilter.search_qs).
+            positions.forEach(function (p) { p.attendee_name = name; });
+        }
         btnReserve.disabled = true;
         btnSell.disabled = true;
         setMsg(sellMsg, "Submitting…", null);
         var body = {status: mode === "sell" ? "p" : "n", positions: positions};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
-        var email = emailInput.value.trim();
         if (email) body.email = email;
         if (mode === "sell") body.payment_provider = "boxoffice";
         api(eventPath("/orders/"), {method: "POST", body: JSON.stringify(body)}).then(function (res) {
@@ -783,6 +802,7 @@
             cart = [];
             activeSeatItem = null;
             emailInput.value = "";
+            nameInput.value = "";
             renderCart();
             loadSellItems();
         });
@@ -867,6 +887,16 @@
         });
     }
 
+    // Customers without an e-mail are still identified by whatever name
+    // submitOrder() attached to their positions (see the "reserve needs an
+    // e-mail or a name" requirement) - shown here so staff can recognize a
+    // no-email reservation by name at a glance, not just via search.
+    function orderCustomerLabel(o) {
+        if (o.email) return o.email;
+        var named = (o.positions || []).find(function (p) { return p.attendee_name; });
+        return named ? named.attendee_name : "no e-mail";
+    }
+
     function renderSearchResults(orders) {
         searchResultsEl.innerHTML = "";
         if (!orders.length) {
@@ -886,7 +916,7 @@
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = pendingSum(o);
             div.appendChild(document.createTextNode(
-                " — " + (o.email || "no e-mail") + " — " + o.status + " — total " + o.total +
+                " — " + orderCustomerLabel(o) + " — " + o.status + " — total " + o.total +
                 (parseFloat(pending) > 0 ? ", pending " + pending : "")
             ));
             div.addEventListener("click", function () { loadOrderDetail(o.code); });
