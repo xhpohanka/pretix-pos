@@ -20,6 +20,7 @@
     var placementPool = {}; // seat_guid -> seat, pending bulk placement on the loaded order
     var orderSeats = [];
     var subeventPriceOverrides = {}; // subeventId -> {items: {itemId: price}, variations: {variationId: price}}
+    var subeventSeatingPlans = {}; // subeventId -> true if that date has a seating plan at all
 
     function loadState() {
         try {
@@ -234,7 +235,14 @@
                 var when = ev.date_from ? new Date(ev.date_from).toLocaleDateString() : "";
                 btn.textContent = pickI18n(ev.name) + (when ? " — " + when : "");
                 btn.addEventListener("click", function () {
-                    state.event = {slug: ev.slug, hasSubevents: ev.has_subevents, name: pickI18n(ev.name)};
+                    state.event = {
+                        slug: ev.slug, hasSubevents: ev.has_subevents, name: pickI18n(ev.name),
+                        // Only meaningful (and only used) for events without
+                        // subevents - see orderIsSeated(). Events *with*
+                        // subevents track this per-date instead, in
+                        // subeventSeatingPlans (loadSubevents()).
+                        seatingPlan: ev.seating_plan || null,
+                    };
                     saveState();
                     boot();
                 });
@@ -350,11 +358,18 @@
         api(eventPath("/subevents/?active=true&ordering=date_from")).then(function (res) {
             var subs = (res.ok && res.data && res.data.results) || [];
             subeventPriceOverrides = {};
+            subeventSeatingPlans = {};
             subs.forEach(function (se) {
                 var opt = document.createElement("option");
                 opt.value = se.id;
                 opt.textContent = pickI18n(se.name) + " — " + new Date(se.date_from).toLocaleString();
                 subeventSelect.appendChild(opt);
+
+                // Whether this date has a seating plan at all - used by
+                // orderIsSeated() to tell "still needs a seat" apart from
+                // "seating doesn't apply here", which a bare "does every
+                // position have a seat" check can't distinguish on its own.
+                subeventSeatingPlans[se.id] = !!se.seating_plan;
 
                 // A date can override an item's/variation's price from the base
                 // default_price - needed to show a genuinely final total instead
@@ -771,14 +786,28 @@
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
 
-    // "Seated" is approximated as "every non-canceled position already has a
-    // seat" - there's no direct API filter for "this position's item
-    // actually requires a seat", so this can under/over-flag a handful of
-    // plain (never-seated) items too, but for this deployment almost every
-    // sold item is seated, making it a reasonable proxy without pulling in
-    // a whole extra seatmap fetch just to sort/color a browsing list.
+    // A position only "needs a seat" if its date actually has a seating plan
+    // at all - a date with none can never have any seated position, so those
+    // positions must not count against "seated" or every order for a plain,
+    // unseated date would wrongly show as "still needs seats" (white)
+    // instead of just not applying at all. This is still an approximation
+    // one level down: an item without its own SeatCategoryMapping on an
+    // otherwise-seated date isn't detected (there's no direct API filter for
+    // "this position's item actually requires a seat", and pulling in a full
+    // seatmap fetch per date just to check would be expensive for a browsing
+    // list) - acceptable since almost every sold item in this deployment is
+    // seated wherever a plan exists at all.
+    function dateHasSeatingPlan(subeventId) {
+        return state.event.hasSubevents ? !!subeventSeatingPlans[subeventId] : !!state.event.seatingPlan;
+    }
+
+    // "Seated" means "nothing left for staff to seat" - true both when every
+    // seatable position already has a seat, and (vacuously) when none of the
+    // order's positions are on a date with a seating plan in the first place.
     function orderIsSeated(o) {
-        var positions = (o.positions || []).filter(function (p) { return !p.canceled; });
+        var positions = (o.positions || []).filter(function (p) {
+            return !p.canceled && dateHasSeatingPlan(p.subevent);
+        });
         return positions.every(function (p) { return !!p.seat; });
     }
 
