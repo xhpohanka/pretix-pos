@@ -273,6 +273,15 @@
         });
     });
 
+    // Reuses the tab button's own click handler above (active-class toggle,
+    // panel visibility, default-list load) instead of duplicating it - used
+    // when double-clicking an occupied seat on the Sell/Reserve map jumps
+    // over to Find order for that seat's order (see renderSeatpick()).
+    function switchToFindOrderTab() {
+        var btn = tabs.filter(function (b) { return b.dataset.tab === "find"; })[0];
+        if (btn) btn.click();
+    }
+
     function currentSubeventId() {
         return state.event.hasSubevents ? (subeventSelect.value || null) : null;
     }
@@ -489,6 +498,16 @@
         };
     }
 
+    // Shared tooltip for every seatmap this plugin draws (Sell/Reserve and
+    // Find order alike) - lets staff see which order occupies a seat without
+    // leaving the map, without them looking different depending on which tab
+    // happens to be open. The seat's own guid is deliberately left out - it's
+    // an internal id, never something staff act on, just noise in a tooltip.
+    function seatTitle(s) {
+        var base = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") + " — " + s.status;
+        return s.order_code ? (base + " — Order " + s.order_code) : base;
+    }
+
     function renderSellItems() {
         sellItemsEl.innerHTML = "";
         if (!sellItems.length) {
@@ -659,8 +678,23 @@
             return isCartSeat(s) ? {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3} : null;
         }, function (s) {
             return isCartSeat(s) ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
-        });
+        }, seatTitle);
     }
+
+    // Double-clicking an occupied seat here jumps to that order in Find
+    // order, same shortcut as the one on Find order's own map (see
+    // initOrderSeatMap()) - staff shouldn't have to go remember/retype an
+    // order code just because they first noticed the seat while selling.
+    // Only one listener is ever needed (svgSell itself is never recreated,
+    // unlike the per-order svg in Find order), so this lives outside
+    // renderSeatpick() instead of being re-attached on every redraw.
+    svgSell.addEventListener("dblclick", function (e) {
+        var el = e.target.closest && e.target.closest("[data-guid]");
+        var seat = el && sellSeats.find(function (s) { return s.guid === el.getAttribute("data-guid"); });
+        if (!seat || seat.status === "free" || !seat.order_code) return;
+        switchToFindOrderTab();
+        loadOrderDetail(seat.order_code);
+    });
 
     function renderCart() {
         cartEl.innerHTML = "";
@@ -1149,19 +1183,8 @@
             return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
         }
 
-        // Lets staff see which order a seat they don't recognize belongs to
-        // without leaving the map - order_code comes from the seatmap API
-        // (added specifically for this), present whenever a non-canceled
-        // pending/paid order holds the seat (so also for this order's own
-        // seats, which is harmless/informative rather than confusing).
-        function titleFn(s) {
-            var base = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") +
-                " (" + s.guid + ") — " + s.status;
-            return s.order_code ? (base + " — Order " + s.order_code) : base;
-        }
-
         function render() {
-            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn, titleFn);
+            window.PretixSeatingRenderer.drawSeats(svg, seats, colorFn, null, null, "pointer", strokeFn, labelColorFn, seatTitle);
         }
 
         // The number of positions actually checked to receive a seat - the hard
