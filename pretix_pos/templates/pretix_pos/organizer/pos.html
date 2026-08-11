@@ -18,6 +18,7 @@
             <strong>{% trans "Point of sale" %}</strong>
             <span id="pos-header-info"></span>
             <span class="pos-header-spacer"></span>
+            <button id="pos-btn-till" type="button" class="pos-btn-link" hidden>{% trans "Till" %}</button>
             <button id="pos-btn-change-event" type="button" class="pos-btn-link" hidden>{% trans "Change event" %}</button>
             <button id="pos-btn-unpair" type="button" class="pos-btn-link" hidden>{% trans "Unpair this device" %}</button>
         </header>
@@ -81,6 +82,23 @@
             </section>
 
             <section id="pos-screen-main" hidden>
+                <section id="pos-till-panel" hidden>
+                    <h2>{% trans "Till summary" %}</h2>
+                    <p class="pos-hint">
+                        {% blocktrans %}
+                            Running totals of everything sold or settled through this terminal,
+                            broken down by how it was paid. This isn't tied to any date or
+                            order - it's just this browser's own tally, so reset it yourself at
+                            the start of a shift.
+                        {% endblocktrans %}
+                    </p>
+                    <div id="pos-till-totals"></div>
+                    <div class="pos-actions">
+                        <button id="pos-till-reset" type="button">{% trans "Reset to zero" %}</button>
+                        <button id="pos-till-close" type="button">{% trans "Close" %}</button>
+                    </div>
+                </section>
+
                 <div id="pos-subevent-bar" hidden>
                     <label for="pos-subevent">{% trans "Date" %}</label>
                     <select id="pos-subevent"></select>
@@ -110,10 +128,16 @@
                             <input type="email" id="pos-email">
                             <label for="pos-name">{% trans "Customer name" %} ({% trans "optional" %})</label>
                             <input type="text" id="pos-name">
-                            <p class="pos-hint">{% trans "Reserving requires an e-mail or a name, so the order can be found again later - selling now (cash) doesn't." %}</p>
+                            <p class="pos-hint">{% trans "Reserving requires an e-mail or a name, so the order can be found again later - selling now doesn't." %}</p>
+                            <label for="pos-payment-method">{% trans "Payment method" %} ({% trans "for \"Sell now\"" %})</label>
+                            <select id="pos-payment-method">
+                                <option value="cash">{% trans "Cash" %}</option>
+                                <option value="qr">{% trans "QR transfer" %}</option>
+                                <option value="card">{% trans "Card" %}</option>
+                            </select>
                             <div class="pos-actions">
                                 <button id="pos-btn-reserve" type="button" disabled>{% trans "Reserve" %}</button>
-                                <button id="pos-btn-sell" type="button" class="pos-btn-primary" disabled>{% trans "Sell now (cash)" %}</button>
+                                <button id="pos-btn-sell" type="button" class="pos-btn-primary" disabled>{% trans "Sell now" %}</button>
                             </div>
                             <div id="pos-sell-msg" class="pos-msg"></div>
                         </div>

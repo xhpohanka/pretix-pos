@@ -39,6 +39,51 @@
         state = {};
     }
 
+    // Running per-terminal totals of what's been sold/settled, broken down by
+    // how it was paid - "how much cash/QR/card should I be holding right now".
+    // Deliberately its own storage key, separate from the device pairing
+    // state above: it's a property of this physical terminal's cash box, not
+    // of which Device record happens to be paired to it, and survives a
+    // reload without survivng a deliberate "Reset to zero" at shift start.
+    // Amounts are tracked as integer cents to avoid floating-point drift
+    // across many additions - the API only ever gives us decimal strings.
+    var TILL_KEY = "pretix_pos_till:" + ORGANIZER;
+    var PAYMENT_METHODS = [
+        {value: "cash", label: "Cash"},
+        {value: "qr", label: "QR transfer"},
+        {value: "card", label: "Card"},
+    ];
+    var till = loadTill();
+
+    function loadTill() {
+        try {
+            var t = JSON.parse(localStorage.getItem(TILL_KEY));
+            if (t && typeof t === "object") return t;
+        } catch (e) {
+            // fall through to a fresh till below
+        }
+        return {cash: 0, qr: 0, card: 0};
+    }
+
+    function saveTill() {
+        localStorage.setItem(TILL_KEY, JSON.stringify(till));
+    }
+
+    function centsOf(str) {
+        var n = Math.round(parseFloat(str) * 100);
+        return isNaN(n) ? 0 : n;
+    }
+
+    function formatCents(c) {
+        return (c / 100).toFixed(2);
+    }
+
+    function addToTill(method, amountStr) {
+        if (!(method in till)) method = "cash";
+        till[method] = (till[method] || 0) + centsOf(amountStr);
+        saveTill();
+    }
+
     function api(path, opts) {
         opts = opts || {};
         var headers = Object.assign({"Content-Type": "application/json"}, opts.headers || {});
@@ -184,6 +229,11 @@
     var headerInfo = document.getElementById("pos-header-info");
     var btnChangeEvent = document.getElementById("pos-btn-change-event");
     var btnUnpair = document.getElementById("pos-btn-unpair");
+    var btnTill = document.getElementById("pos-btn-till");
+    var tillPanel = document.getElementById("pos-till-panel");
+    var tillTotalsEl = document.getElementById("pos-till-totals");
+    var tillResetBtn = document.getElementById("pos-till-reset");
+    var tillCloseBtn = document.getElementById("pos-till-close");
 
     btnUnpair.addEventListener("click", function () {
         if (!window.confirm("Unpair this terminal? You will need a new initialization token to reconnect.")) return;
@@ -195,6 +245,38 @@
         delete state.event;
         saveState();
         boot();
+    });
+
+    function renderTillPanel() {
+        tillTotalsEl.innerHTML = "";
+        var total = 0;
+        PAYMENT_METHODS.forEach(function (m) {
+            var cents = till[m.value] || 0;
+            total += cents;
+            var row = document.createElement("p");
+            row.textContent = m.label + ": " + formatCents(cents);
+            tillTotalsEl.appendChild(row);
+        });
+        var totalRow = document.createElement("p");
+        var strong = document.createElement("strong");
+        strong.textContent = "Total: " + formatCents(total);
+        totalRow.appendChild(strong);
+        tillTotalsEl.appendChild(totalRow);
+    }
+
+    btnTill.addEventListener("click", function () {
+        renderTillPanel();
+        tillPanel.hidden = !tillPanel.hidden;
+    });
+
+    tillResetBtn.addEventListener("click", function () {
+        till = {cash: 0, qr: 0, card: 0};
+        saveTill();
+        renderTillPanel();
+    });
+
+    tillCloseBtn.addEventListener("click", function () {
+        tillPanel.hidden = true;
     });
 
     // ---------------------------------------------------------------- pairing
@@ -421,6 +503,7 @@
         headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
         btnChangeEvent.hidden = false;
         btnUnpair.hidden = false;
+        btnTill.hidden = false;
 
         // A cart can span several dates of the same event (see subeventSelect's
         // change handler below) but never several events - this is the one
@@ -525,6 +608,7 @@
     var cartEl = document.getElementById("pos-cart");
     var emailInput = document.getElementById("pos-email");
     var nameInput = document.getElementById("pos-name");
+    var paymentMethodSelect = document.getElementById("pos-payment-method");
     var btnReserve = document.getElementById("pos-btn-reserve");
     var btnSell = document.getElementById("pos-btn-sell");
     var sellMsg = document.getElementById("pos-sell-msg");
@@ -885,13 +969,22 @@
             // search already matches against (core's OrderFilter.search_qs).
             positions.forEach(function (p) { p.attendee_name = name; });
         }
+        var method = paymentMethodSelect.value;
         btnReserve.disabled = true;
         btnSell.disabled = true;
         setMsg(sellMsg, "Submitting…", null);
         var body = {status: mode === "sell" ? "p" : "n", positions: positions};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
-        if (mode === "sell") body.payment_provider = "boxoffice";
+        if (mode === "sell") {
+            body.payment_provider = "boxoffice";
+            // Tagged onto the same immediate boxoffice payment core already
+            // uses for a cash sale - BoxOfficeProvider.api_payment_details()
+            // already reads back an info.payment_type field (core's admin
+            // template even special-cases "cash"), so this needs no new
+            // payment provider at all, just this one extra key.
+            body.payment_info = {payment_type: method};
+        }
         api(eventPath("/orders/"), {method: "POST", body: JSON.stringify(body)}).then(function (res) {
             if (!res.ok) {
                 setMsg(sellMsg, describeError(res.data), "error");
@@ -905,6 +998,7 @@
             // the sale completes was the whole problem being fixed here.
             setMsg(sellMsg, (mode === "sell" ? "Sold" : "Reserved") + " — order " + res.data.code +
                 ", total " + res.data.total + ".", "success");
+            if (mode === "sell") addToTill(method, res.data.total);
             cart = [];
             activeSeatItem = null;
             emailInput.value = "";
@@ -1155,11 +1249,20 @@
         orderDetailEl.appendChild(list);
 
         if (order.status === "n") {
+            var payMethodSelect = document.createElement("select");
+            PAYMENT_METHODS.forEach(function (m) {
+                var opt = document.createElement("option");
+                opt.value = m.value;
+                opt.textContent = m.label;
+                payMethodSelect.appendChild(opt);
+            });
+            orderDetailEl.appendChild(payMethodSelect);
+
             var payBtn = document.createElement("button");
             payBtn.type = "button";
             payBtn.className = "pos-btn-primary";
-            payBtn.textContent = "Take payment (cash)";
-            payBtn.addEventListener("click", function () { payOrder(order); });
+            payBtn.textContent = "Take payment";
+            payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
             orderDetailEl.appendChild(payBtn);
         }
 
@@ -1222,14 +1325,19 @@
         });
     }
 
-    function payOrder(order) {
+    function payOrder(order, method) {
         var msg = document.createElement("div");
         msg.className = "pos-msg";
         orderDetailEl.appendChild(msg);
         setMsg(msg, "Charging…", null);
+        // Captured before the request, not re-read afterwards - by the time
+        // this resolves the order's own pending sum will be zero (it's just
+        // been paid), so this is the one place that actually knows how much
+        // is being added to the till for this payment.
+        var amount = pendingSum(order);
         api(eventPath("/orders/" + order.code + "/payments/"), {
             method: "POST",
-            body: JSON.stringify({provider: "boxoffice", amount: pendingSum(order), state: "created"}),
+            body: JSON.stringify({provider: "boxoffice", amount: amount, state: "created", info: {payment_type: method}}),
         }).then(function (res) {
             if (!res.ok) {
                 setMsg(msg, describeError(res.data), "error");
@@ -1242,6 +1350,7 @@
                 setMsg(msg, describeError(res2.data), "error");
                 return;
             }
+            addToTill(method, amount);
             loadOrderDetail(order.code);
             // loadOrderDetail() only refreshes the right-hand order detail
             // panel - the search-results list on the left still shows this
@@ -1694,16 +1803,19 @@
     // -------------------------------------------------------------------- boot
 
     function boot() {
+        tillPanel.hidden = true;
         if (!state.token) {
             showScreen("pair");
             btnChangeEvent.hidden = true;
             btnUnpair.hidden = true;
+            btnTill.hidden = true;
             headerInfo.textContent = "";
             return;
         }
         if (!state.event) {
             btnChangeEvent.hidden = true;
             btnUnpair.hidden = false;
+            btnTill.hidden = false;
             headerInfo.textContent = state.deviceName || "";
             loadEvents();
             return;

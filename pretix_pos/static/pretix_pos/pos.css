@@ -81,6 +81,16 @@ button.pos-btn-link:hover { color: #fff; }
     margin: 40px auto;
 }
 
+#pos-till-panel {
+    background: #fff;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 14px;
+    max-width: 480px;
+}
+
+#pos-till-totals p { margin: 4px 0; }
+
 #pos-pair-form button, #pos-restore-form button { margin-top: 12px; }
 #pos-screen-pair hr { margin: 28px 0; border: none; border-top: 1px solid #ddd; }
 
