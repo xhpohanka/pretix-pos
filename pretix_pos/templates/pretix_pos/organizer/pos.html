@@ -39,6 +39,40 @@
                     <button type="submit">{% trans "Connect" %}</button>
                 </form>
                 <div id="pos-pair-msg" class="pos-msg"></div>
+
+                <hr>
+
+                <h2>{% trans "Already paired this terminal before?" %}</h2>
+                <p>
+                    {% blocktrans %}
+                        If this browser forgot its connection (its saved data was cleared, or
+                        you're on a different computer), restore it yourself with the recovery
+                        code you saved when it was first paired here - no administrator needed.
+                    {% endblocktrans %}
+                </p>
+                <form id="pos-restore-form">
+                    <label for="pos-restore-code">{% trans "Recovery code" %}</label>
+                    <input type="text" id="pos-restore-code" autocomplete="off" required>
+                    <button type="submit">{% trans "Restore" %}</button>
+                </form>
+                <div id="pos-restore-msg" class="pos-msg"></div>
+            </section>
+
+            <section id="pos-screen-recovery" hidden>
+                <h1>{% trans "Save this recovery code" %}</h1>
+                <p>
+                    {% blocktrans %}
+                        Write this code down and keep it somewhere safe near the till (taped
+                        underneath, in a password manager, with a manager, ...). If this browser
+                        ever forgets its connection to this terminal, you can restore access
+                        yourself with this exact code - no administrator needed.
+                    {% endblocktrans %}
+                </p>
+                <div id="pos-recovery-code" class="pos-recovery-code"></div>
+                <div class="pos-actions">
+                    <button id="pos-recovery-copy" type="button">{% trans "Copy" %}</button>
+                    <button id="pos-recovery-continue" type="button" class="pos-btn-primary">{% trans "I've saved it - continue" %}</button>
+                </div>
             </section>
 
             <section id="pos-screen-events" hidden>

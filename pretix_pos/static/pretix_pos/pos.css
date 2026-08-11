@@ -73,7 +73,7 @@ button.pos-btn-link:hover { color: #fff; }
     padding: 20px;
 }
 
-#pos-screen-pair, #pos-screen-events {
+#pos-screen-pair, #pos-screen-events, #pos-screen-recovery {
     background: #fff;
     border-radius: 6px;
     padding: 20px;
@@ -81,7 +81,22 @@ button.pos-btn-link:hover { color: #fff; }
     margin: 40px auto;
 }
 
-#pos-pair-form button { margin-top: 12px; }
+#pos-pair-form button, #pos-restore-form button { margin-top: 12px; }
+#pos-screen-pair hr { margin: 28px 0; border: none; border-top: 1px solid #ddd; }
+
+.pos-recovery-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    word-break: break-all;
+    user-select: all;
+    background: #f4f5f7;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 14px;
+    margin: 16px 0;
+}
 
 .pos-msg { margin-top: 10px; color: #555; }
 .pos-msg.pos-error { color: #c62828; font-weight: 600; }

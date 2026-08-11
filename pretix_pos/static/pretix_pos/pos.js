@@ -59,6 +59,30 @@
             });
     }
 
+    // Same request/response shape as api(), but authenticates with an
+    // explicitly-given token instead of state.token - used only by the
+    // recovery-code restore flow (pairForm's own submit handler) to validate
+    // a candidate token *before* committing it to state, without disturbing
+    // whatever (if anything) is currently saved there.
+    function apiAs(path, token, opts) {
+        opts = opts || {};
+        var headers = Object.assign({"Content-Type": "application/json", Authorization: "Device " + token}, opts.headers || {});
+        return fetch(API_BASE + path, Object.assign({}, opts, {headers: headers, cache: "no-store"}))
+            .then(function (r) {
+                return r.text().then(function (t) {
+                    var data = null;
+                    if (t) {
+                        try {
+                            data = JSON.parse(t);
+                        } catch (e) {
+                            // non-JSON error body, leave data null
+                        }
+                    }
+                    return {status: r.status, ok: r.ok, data: data};
+                });
+            });
+    }
+
     // The public API paginates list endpoints (PAGE_SIZE=50) - a plan with
     // more than 50 seats (any real venue above ~3 rows of 15) silently lost
     // every seat past the first page, since api() alone only ever fetched
@@ -146,6 +170,7 @@
 
     var screens = {
         pair: document.getElementById("pos-screen-pair"),
+        recovery: document.getElementById("pos-screen-recovery"),
         events: document.getElementById("pos-screen-events"),
         main: document.getElementById("pos-screen-main"),
     };
@@ -177,6 +202,37 @@
     var pairForm = document.getElementById("pos-pair-form");
     var pairTokenInput = document.getElementById("pos-pair-token");
     var pairMsg = document.getElementById("pos-pair-msg");
+    var restoreForm = document.getElementById("pos-restore-form");
+    var restoreCodeInput = document.getElementById("pos-restore-code");
+    var restoreMsg = document.getElementById("pos-restore-msg");
+    var recoveryCodeEl = document.getElementById("pos-recovery-code");
+    var recoveryCopyBtn = document.getElementById("pos-recovery-copy");
+    var recoveryContinueBtn = document.getElementById("pos-recovery-continue");
+
+    // The device's api_token is a permanent bearer credential, but pretix
+    // core never shows it again anywhere once pairing succeeds (confirmed by
+    // reading the control panel's device views/templates) - if this
+    // browser's localStorage is ever cleared, there is otherwise no way for
+    // *staff* to get back in without an administrator resetting the device
+    // server-side. So the token itself doubles as a self-service recovery
+    // code: shown once right after pairing, with an explicit "write this
+    // down somewhere safe" step staff must click through before the app
+    // proceeds, and restorable later via the plain form below with no admin
+    // involved - see restoreForm's handler.
+    function showRecoveryCode(token) {
+        recoveryCodeEl.textContent = token;
+        showScreen("recovery");
+    }
+
+    recoveryContinueBtn.addEventListener("click", function () {
+        boot();
+    });
+
+    recoveryCopyBtn.addEventListener("click", function () {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(recoveryCodeEl.textContent).catch(function () {});
+        }
+    });
 
     pairForm.addEventListener("submit", function (ev) {
         ev.preventDefault();
@@ -204,9 +260,43 @@
                 deviceName: res.data.name,
             };
             saveState();
-            boot();
+            pairTokenInput.value = "";
+            setMsg(pairMsg, "", null);
+            showRecoveryCode(res.data.api_token);
         }).catch(function () {
             setMsg(pairMsg, "Network error.", "error");
+        });
+    });
+
+    // Self-service recovery for a browser that forgot its pairing - staff
+    // paste back the code shown at pairing time, no admin involved. Uses
+    // /device/info (rather than /device/initialize, which requires a
+    // never-used *initialization* token, not the permanent api_token this
+    // form takes) both to validate the code and to refetch the device's own
+    // name/serial, so state ends up identical to a fresh pairing.
+    restoreForm.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var code = restoreCodeInput.value.trim();
+        if (!code) return;
+        setMsg(restoreMsg, "Checking…", null);
+        apiAs("/device/info", code).then(function (res) {
+            if (!res.ok || !res.data || !res.data.device) {
+                setMsg(restoreMsg, "That code doesn't look valid, or this device was revoked - ask an administrator to re-pair it.", "error");
+                return;
+            }
+            var d = res.data.device;
+            state = {
+                token: code,
+                deviceId: d.device_id,
+                uniqueSerial: d.unique_serial,
+                deviceName: d.name,
+            };
+            saveState();
+            restoreCodeInput.value = "";
+            setMsg(restoreMsg, "", null);
+            boot();
+        }).catch(function () {
+            setMsg(restoreMsg, "Network error.", "error");
         });
     });
 
