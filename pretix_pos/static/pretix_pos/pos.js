@@ -97,17 +97,39 @@
         return keys.length ? v[keys[0]] : "";
     }
 
-    function describeError(data) {
-        if (!data) return "Unknown error.";
+    // The order-create endpoint's `positions` errors are an array with one
+    // entry per submitted position (empty {} for positions with no error) -
+    // a naive Array.isArray(v) ? v.join(" ") : ... (the previous approach)
+    // stringified each per-position *object* via join(), producing literal
+    // "[object Object]" text instead of the actual nested field errors.
+    // Recurses through strings/arrays/objects uniformly instead, and drops
+    // empty branches (like the no-error {} placeholders) instead of turning
+    // them into noise.
+    function flattenError(data) {
+        if (data == null) return "";
         if (typeof data === "string") return data;
-        if (data.detail) return String(data.detail);
-        var parts = [];
-        Object.keys(data).forEach(function (key) {
-            var v = data[key];
-            var flat = Array.isArray(v) ? v.join(" ") : (typeof v === "object" ? describeError(v) : String(v));
-            parts.push(key === "non_field_errors" ? flat : (key + ": " + flat));
-        });
-        return parts.join(" | ") || "Unknown error.";
+        if (Array.isArray(data)) {
+            var items = [];
+            data.forEach(function (item, i) {
+                var s = flattenError(item);
+                if (s) items.push((data.length > 1 ? "[" + i + "] " : "") + s);
+            });
+            return items.join(" | ");
+        }
+        if (typeof data === "object") {
+            if (data.detail) return String(data.detail);
+            var parts = [];
+            Object.keys(data).forEach(function (key) {
+                var flat = flattenError(data[key]);
+                if (flat) parts.push(key === "non_field_errors" ? flat : (key + ": " + flat));
+            });
+            return parts.join(" | ");
+        }
+        return String(data);
+    }
+
+    function describeError(data) {
+        return flattenError(data) || "Unknown error.";
     }
 
     function setMsg(el, text, kind) {
