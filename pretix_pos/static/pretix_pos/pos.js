@@ -495,18 +495,28 @@
             row_label: s.row_label, seat_label: s.seat_label,
             status: s.status, product_id: s.product,
             category_color: s.category_color, radius: s.radius,
-            order_code: s.order_code,
+            order_code: s.order_code, order_email: s.order_email,
+            order_attendee_name: s.order_attendee_name,
         };
     }
 
     // Shared tooltip for every seatmap this plugin draws (Sell/Reserve and
-    // Find order alike) - lets staff see which order occupies a seat without
-    // leaving the map, without them looking different depending on which tab
-    // happens to be open. The seat's own guid is deliberately left out - it's
-    // an internal id, never something staff act on, just noise in a tooltip.
+    // Find order alike) - deliberately just the order code/e-mail/attendee
+    // name (whichever aren't blank), nothing else. Zone/row/seat/status is
+    // already obvious from the seat's own position and color on the map, so
+    // repeating it in the tooltip is just noise here - unlike, say, the
+    // control assign GUI, which has no seat labels drawn on the map itself
+    // and still needs the default zone/row/seat/status tooltip (see
+    // drawSeats() in seatmap.js, which only uses this instead of its own
+    // default when a titleFn is actually given). No order on this seat at
+    // all (free, blocked, held in someone's cart) means an empty tooltip,
+    // not the default text.
     function seatTitle(s) {
-        var base = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") + " — " + s.status;
-        return s.order_code ? (base + " — Order " + s.order_code) : base;
+        if (!s.order_code) return "";
+        var parts = [s.order_code];
+        if (s.order_email) parts.push(s.order_email);
+        if (s.order_attendee_name) parts.push(s.order_attendee_name);
+        return parts.join(" — ");
     }
 
     function renderSellItems() {
@@ -798,7 +808,13 @@
                 renderCart();
                 return;
             }
-            setMsg(sellMsg, (mode === "sell" ? "Sold" : "Reserved") + " — order " + res.data.code + ".", "success");
+            // Include the total: the cart (and its own visible "Total: ..."
+            // line) is about to be cleared below, and for a cash sale staff
+            // still need to know how much to actually collect from the
+            // customer standing right there - losing that number the moment
+            // the sale completes was the whole problem being fixed here.
+            setMsg(sellMsg, (mode === "sell" ? "Sold" : "Reserved") + " — order " + res.data.code +
+                ", total " + res.data.total + ".", "success");
             cart = [];
             activeSeatItem = null;
             emailInput.value = "";
