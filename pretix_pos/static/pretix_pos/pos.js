@@ -274,6 +274,19 @@
         return opt ? opt.textContent : ("#" + id);
     }
 
+    // Order positions come from the API with a numeric `subevent` (or null);
+    // currentSubeventId() reads a <select>'s value, always a string. A plain
+    // `===` between the two is always false even when they mean the same
+    // date - normalize both sides through this before comparing anywhere a
+    // position's subevent needs to be checked against "the date currently on
+    // screen" (null/undefined/"" all mean "no subevent", for events that
+    // don't have any).
+    function subeventsMatch(a, b) {
+        var na = (a == null || a === "") ? null : String(a);
+        var nb = (b == null || b === "") ? null : String(b);
+        return na === nb;
+    }
+
     // The price actually charged for an item/variation on a given date - a
     // date can override the base default_price (see loadSubevents()), so the
     // cart's displayed total can be shown as a real final amount instead of
@@ -368,6 +381,20 @@
         // is currently selected.
         activeSeatItem = null;
         loadForCurrentContext();
+
+        // An order loaded in "Find order" has its own seatmap tied to
+        // whichever date is on screen (see renderOrderDetail()) - if one is
+        // open, switching the date here must re-fetch/rebuild it for the new
+        // date, not just leave the old date's map showing. Clears the
+        // placement pool too: pool entries are seat objects from the *old*
+        // date's map, and dates sharing a seating plan reuse the same seat
+        // guids (see the isCartSeat()/isOwnSeat() comments elsewhere in this
+        // file) - carrying them over could silently misplace a seat search on
+        // the new date's identically-numbered seat instead.
+        if (currentOrder) {
+            placementPool = {};
+            renderOrderDetail();
+        }
     });
 
     function loadForCurrentContext() {
@@ -843,20 +870,36 @@
     // order detail having to be refetched and rebuilt from scratch.
     function renderPositionList(container) {
         container.innerHTML = "";
+        var seId = currentSubeventId();
         var positions = (currentOrder.positions || []).filter(function (pos) { return !pos.canceled; });
         positions.forEach(function (pos) {
+            // An order can span several dates (see subeventSelect's change
+            // handler) but the seatmap below only ever shows one date at a
+            // time - a position for any *other* date is shown for context
+            // (so staff can see the whole order) but can't be checked/placed
+            // from here, since there's no seatmap on screen for it right now.
+            var otherDate = !subeventsMatch(pos.subevent, seId);
+
             var row = document.createElement("div");
-            row.className = "pos-position-row";
+            row.className = "pos-position-row" + (otherDate ? " pos-position-row-other-date" : "");
 
             var cb = document.createElement("input");
             cb.type = "checkbox";
             cb.dataset.positionId = pos.id;
-            cb.checked = !pos.seat;
+            cb.disabled = otherDate;
+            cb.checked = !otherDate && !pos.seat;
             row.appendChild(cb);
 
             var label = document.createElement("span");
             label.textContent = positionLabel(pos);
             row.appendChild(label);
+
+            if (otherDate) {
+                var dateBadge = document.createElement("span");
+                dateBadge.className = "pos-seat-badge pos-date-badge";
+                dateBadge.textContent = subeventLabel(pos.subevent);
+                row.appendChild(dateBadge);
+            }
 
             var badge = document.createElement("span");
             if (pos.seat) {
@@ -921,18 +964,25 @@
             orderDetailEl.appendChild(payBtn);
         }
 
-        var positions = (order.positions || []).filter(function (pos) { return !pos.canceled; });
-        var seIds = Array.from(new Set(positions.map(function (pos) { return pos.subevent; }).filter(Boolean)));
+        // The seatmap always follows whichever date is selected in the bar at
+        // the top of the screen (shared with Sell/Reserve) - NOT "whichever
+        // date(s) this order happens to have positions for". An order that
+        // spans several dates just shows this date's positions as checkable/
+        // placeable and every other date's positions as disabled context rows
+        // in the list above (see renderPositionList()) - switching the date
+        // above re-renders this whole thing for the newly selected date (see
+        // subeventSelect's change handler).
+        var seId = currentSubeventId();
         var seatMapPromise;
         if (!window.PretixSeatingRenderer) {
-            seatMapPromise = Promise.resolve({multiDate: false, results: []});
-        } else if (seIds.length > 1) {
-            seatMapPromise = Promise.resolve({multiDate: true, results: []});
+            seatMapPromise = Promise.resolve({noDate: false, results: []});
+        } else if (state.event.hasSubevents && !seId) {
+            seatMapPromise = Promise.resolve({noDate: true, results: []});
         } else {
-            seatMapPromise = apiAllPages(seIds.length === 1 ? eventPath("/subevents/" + seIds[0] + "/seatmap/") : eventPath("/seatmap/"))
+            seatMapPromise = apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
                 .then(function (res) {
                     var raw = (res.ok && res.data && res.data.results) || [];
-                    return {multiDate: false, results: raw.map(toDrawSeat)};
+                    return {noDate: false, results: raw.map(toDrawSeat)};
                 });
         }
 
@@ -943,21 +993,18 @@
         seatMapPromise.then(function (info) {
             orderSeats = info.results;
             orderSeatmapWrapEl.innerHTML = "";
-            if (info.multiDate) {
-                var warn = document.createElement("p");
-                warn.className = "pos-hint";
-                warn.textContent = "This order spans multiple dates - seat placement here only covers one date at a time and is not shown.";
-                orderSeatmapWrapEl.appendChild(warn);
+            if (info.noDate) {
+                orderSeatmapWrapEl.textContent = "Choose a date above to place seats for that date.";
                 return;
             }
             if (!orderSeats.length) {
-                orderSeatmapWrapEl.textContent = "This order has no seated positions.";
+                orderSeatmapWrapEl.textContent = "This date has no seated positions.";
                 return;
             }
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
-            hint.textContent = "This order's own seats are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order.";
+            hint.textContent = "This order's own seats (for the date selected above) are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.";
             orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -972,7 +1019,7 @@
             orderSeatmapWrapEl.appendChild(placeBtn);
             orderSeatmapWrapEl.appendChild(placeMsg);
 
-            initOrderSeatMap(svg, placeBtn, placeMsg, list);
+            initOrderSeatMap(svg, placeBtn, placeMsg, list, seId);
         });
     }
 
@@ -1004,24 +1051,32 @@
 
     var seatMapMouseUpHandler = null;
 
-    function initOrderSeatMap(svg, placeBtn, msgEl, positionListEl) {
+    function initOrderSeatMap(svg, placeBtn, msgEl, positionListEl, subeventId) {
         var seats = orderSeats;
         var drag = null;
 
         if (seatMapMouseUpHandler) window.removeEventListener("mouseup", seatMapMouseUpHandler);
 
+        // Scoped to *this date* (subeventId, whatever renderOrderDetail() is
+        // currently showing) - not just "any position with a matching seat
+        // guid". An order can span several dates, and dates sharing a seating
+        // plan reuse the exact same seat guids (see subeventsMatch()'s own
+        // comment and the isCartSeat()/isOwnSeat() precedent elsewhere in
+        // this file) - without this, a position for a *different* date could
+        // be shown/dragged/unassigned as if it were on today's map just
+        // because some other date's seat happens to share this map's guid.
         function ownPositionOfSeat(seat) {
             return (currentOrder.positions || []).find(function (p) {
-                return !p.canceled && p.seat && p.seat.seat_guid === seat.guid;
+                return !p.canceled && p.seat && p.seat.seat_guid === seat.guid && subeventsMatch(p.subevent, subeventId);
             }) || null;
         }
 
-        // Every seat currently assigned to this order - used both for the
-        // Ctrl+drag block-move preview (see updateGhosts()) and to know which
-        // seats moveBlock() itself needs to move.
+        // Every seat currently assigned to this order *for this date* - used
+        // both for the Ctrl+drag block-move preview (see updateGhosts()) and
+        // to know which seats moveBlock() itself needs to move.
         function ownSeats() {
             return (currentOrder.positions || [])
-                .filter(function (p) { return !p.canceled && p.seat; })
+                .filter(function (p) { return !p.canceled && p.seat && subeventsMatch(p.subevent, subeventId); })
                 .map(function (p) { return seats.find(function (s) { return s.guid === p.seat.seat_guid; }); })
                 .filter(Boolean);
         }
@@ -1355,7 +1410,7 @@
             if (!dx && !dy) return;
 
             var blockPositions = (currentOrder.positions || []).filter(function (p) {
-                return !p.canceled && p.seat;
+                return !p.canceled && p.seat && subeventsMatch(p.subevent, subeventId);
             });
             var blockGuids = {};
             blockPositions.forEach(function (p) { blockGuids[p.seat.seat_guid] = true; });

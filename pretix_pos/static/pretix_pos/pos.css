@@ -232,6 +232,9 @@ button.pos-tab.active {
 
 .pos-position-row input[type=checkbox] { width: auto; }
 
+.pos-position-row-other-date { opacity: 0.55; }
+.pos-date-badge { background: #cfe3f7; }
+
 .pos-seat-badge {
     display: inline-block;
     padding: 1px 8px;
