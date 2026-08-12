@@ -1,6 +1,7 @@
 {% load i18n static %}
+{% get_current_language as LANGUAGE_CODE %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -166,6 +167,7 @@
     </div>
 
     <script src="{% static "pretix_seating/seatmap.js" %}"></script>
+    <script src="{% url "plugins:pretix_pos:organizer.pos.jsi18n" organizer=organizer.slug %}"></script>
     <script src="{% static "pretix_pos/pos.js" %}"></script>
 </body>
 </html>

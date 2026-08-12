@@ -1,9 +1,21 @@
 from django.http import Http404
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
+from django.views.i18n import JavaScriptCatalog
 from i18nfield.strings import LazyI18nString
 
 from .channels import POSSalesChannelType
+
+
+class POSJavaScriptCatalog(JavaScriptCatalog):
+    """
+    pos.js's own translatable strings (djangojs domain) - separate from
+    pretix core's own /jsi18n/<lang>/ (pretix.base.views.js_catalog), which
+    is scoped to the "pretix" package only and would never include this
+    plugin's catalog.
+    """
+    domain = "djangojs"
+    packages = ["pretix_pos"]
 
 
 class POSAppView(TemplateView):

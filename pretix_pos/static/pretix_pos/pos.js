@@ -49,9 +49,9 @@
     // across many additions - the API only ever gives us decimal strings.
     var TILL_KEY = "pretix_pos_till:" + ORGANIZER;
     var PAYMENT_METHODS = [
-        {value: "cash", label: "Cash"},
-        {value: "qr", label: "QR transfer"},
-        {value: "card", label: "Card"},
+        {value: "cash", label: gettext("Cash")},
+        {value: "qr", label: gettext("QR transfer")},
+        {value: "card", label: gettext("Card")},
     ];
     var till = loadTill();
 
@@ -199,7 +199,7 @@
     }
 
     function describeError(data) {
-        return flattenError(data) || "Unknown error.";
+        return flattenError(data) || gettext("Unknown error.");
     }
 
     function setMsg(el, text, kind) {
@@ -236,7 +236,7 @@
     var tillCloseBtn = document.getElementById("pos-till-close");
 
     btnUnpair.addEventListener("click", function () {
-        if (!window.confirm("Unpair this terminal? You will need a new initialization token to reconnect.")) return;
+        if (!window.confirm(gettext("Unpair this terminal? You will need a new initialization token to reconnect."))) return;
         clearState();
         boot();
     });
@@ -259,7 +259,7 @@
         });
         var totalRow = document.createElement("p");
         var strong = document.createElement("strong");
-        strong.textContent = "Total: " + formatCents(total);
+        strong.textContent = interpolate(gettext("Total: %(amount)s"), {amount: formatCents(total)}, true);
         totalRow.appendChild(strong);
         tillTotalsEl.appendChild(totalRow);
     }
@@ -320,7 +320,7 @@
         ev.preventDefault();
         var token = pairTokenInput.value.trim();
         if (!token) return;
-        setMsg(pairMsg, "Connecting…", null);
+        setMsg(pairMsg, gettext("Connecting…"), null);
         api("/device/initialize", {
             method: "POST",
             body: JSON.stringify({
@@ -346,7 +346,7 @@
             setMsg(pairMsg, "", null);
             showRecoveryCode(res.data.api_token);
         }).catch(function () {
-            setMsg(pairMsg, "Network error.", "error");
+            setMsg(pairMsg, gettext("Network error."), "error");
         });
     });
 
@@ -360,10 +360,10 @@
         ev.preventDefault();
         var code = restoreCodeInput.value.trim();
         if (!code) return;
-        setMsg(restoreMsg, "Checking…", null);
+        setMsg(restoreMsg, gettext("Checking…"), null);
         apiAs("/device/info", code).then(function (res) {
             if (!res.ok || !res.data || !res.data.device) {
-                setMsg(restoreMsg, "That code doesn't look valid, or this device was revoked - ask an administrator to re-pair it.", "error");
+                setMsg(restoreMsg, gettext("That code doesn't look valid, or this device was revoked - ask an administrator to re-pair it."), "error");
                 return;
             }
             var d = res.data.device;
@@ -378,7 +378,7 @@
             setMsg(restoreMsg, "", null);
             boot();
         }).catch(function () {
-            setMsg(restoreMsg, "Network error.", "error");
+            setMsg(restoreMsg, gettext("Network error."), "error");
         });
     });
 
@@ -388,15 +388,15 @@
 
     function loadEvents() {
         showScreen("events");
-        eventsList.textContent = "Loading…";
+        eventsList.textContent = gettext("Loading…");
         api("/organizers/" + ORGANIZER + "/events/?ordering=-date_from").then(function (res) {
             if (!res.ok) {
-                eventsList.textContent = "Could not load events (" + describeError(res.data) + ").";
+                eventsList.textContent = interpolate(gettext("Could not load events (%(error)s)."), {error: describeError(res.data)}, true);
                 return;
             }
             var events = (res.data && res.data.results) || [];
             if (!events.length) {
-                eventsList.textContent = "This device has no events assigned to it. Ask an administrator to grant it access on the Devices page.";
+                eventsList.textContent = gettext("This device has no events assigned to it. Ask an administrator to grant it access on the Devices page.");
                 return;
             }
             eventsList.innerHTML = "";
@@ -614,9 +614,9 @@
     var sellMsg = document.getElementById("pos-sell-msg");
 
     function loadSellItems() {
-        sellItemsEl.textContent = "Loading…";
+        sellItemsEl.textContent = gettext("Loading…");
         if (state.event.hasSubevents && !subeventSelect.value) {
-            sellItemsEl.textContent = "Choose a date above.";
+            sellItemsEl.textContent = gettext("Choose a date above.");
             sellItems = [];
             sellSeats = [];
             return;
@@ -696,7 +696,7 @@
     function renderSellItems() {
         sellItemsEl.innerHTML = "";
         if (!sellItems.length) {
-            sellItemsEl.textContent = "No items available.";
+            sellItemsEl.textContent = gettext("No items available.");
             return;
         }
         sellItems.forEach(function (item) {
@@ -723,7 +723,7 @@
         if (item.needsSeat) {
             var label = document.createElement("div");
             label.className = "pos-item-title";
-            label.textContent = item.name + " (" + fmtMoney(item.price) + ") — seated";
+            label.textContent = interpolate(gettext("%(name)s (%(price)s) — seated"), {name: item.name, price: fmtMoney(item.price)}, true);
             row.appendChild(label);
 
             var seId = currentSubeventId();
@@ -733,7 +733,9 @@
                 // to click here, just a status readout.
                 var status = document.createElement("span");
                 status.className = "pos-item-price";
-                status.textContent = seatCount ? seatCount + " selected" : "Pick seats below";
+                status.textContent = seatCount
+                    ? interpolate(ngettext("%(count)s selected", "%(count)s selected", seatCount), {count: seatCount}, true)
+                    : gettext("Pick seats below");
                 row.appendChild(status);
             } else {
                 // Only reachable when more than one seated item exists - the map
@@ -741,7 +743,9 @@
                 // item a click on the (shared) seatmap adds to.
                 var btn = document.createElement("button");
                 btn.type = "button";
-                btn.textContent = "Switch to this item" + (seatCount ? " (" + seatCount + ")" : "");
+                btn.textContent = seatCount
+                    ? interpolate(gettext("Switch to this item (%(count)s)"), {count: seatCount}, true)
+                    : gettext("Switch to this item");
                 btn.addEventListener("click", function () {
                     activeSeatItem = item.id;
                     renderSellItems();
@@ -827,7 +831,7 @@
             return;
         }
         seatpickWrap.hidden = false;
-        seatpickTitle.textContent = "Seats for: " + pickI18n(itemsById[activeSeatItem].name);
+        seatpickTitle.textContent = interpolate(gettext("Seats for: %(name)s"), {name: pickI18n(itemsById[activeSeatItem].name)}, true);
         var seId = currentSubeventId();
         // Same ring-only, no-fill treatment as pretix_seating's eshop picker for
         // "in cart, not yet submitted" - a solid fixed color could collide with
@@ -884,7 +888,7 @@
     function renderCart() {
         cartEl.innerHTML = "";
         if (!cart.length) {
-            cartEl.textContent = "Empty.";
+            cartEl.textContent = gettext("Empty.");
             btnReserve.disabled = true;
             btnSell.disabled = true;
             return;
@@ -910,7 +914,7 @@
             span.textContent = name + (c.price != null ? " (" + c.price + ")" : "");
             var rm = document.createElement("button");
             rm.type = "button";
-            rm.textContent = "Remove";
+            rm.textContent = gettext("Remove");
             rm.addEventListener("click", function () {
                 cart.splice(i, 1);
                 renderSellItems();
@@ -927,7 +931,7 @@
         // for the only thing that could otherwise make this diverge from what
         // the server charges (per-date price overrides), and POS doesn't
         // support vouchers/memberships/bundles that could shift it further.
-        totalDiv.textContent = "Total: " + total.toFixed(2);
+        totalDiv.textContent = interpolate(gettext("Total: %(amount)s"), {amount: total.toFixed(2)}, true);
         cartEl.appendChild(totalDiv);
         btnReserve.disabled = false;
         btnSell.disabled = false;
@@ -958,7 +962,7 @@
         // customer without (or unwilling to give) an e-mail would get a
         // reservation nobody could ever match back to them.
         if (mode === "reserve" && !email && !name) {
-            setMsg(sellMsg, "Enter an e-mail or a name before reserving - otherwise there's no way to find this order again later.", "error");
+            setMsg(sellMsg, gettext("Enter an e-mail or a name before reserving - otherwise there's no way to find this order again later."), "error");
             return;
         }
         if (name) {
@@ -972,7 +976,7 @@
         var method = paymentMethodSelect.value;
         btnReserve.disabled = true;
         btnSell.disabled = true;
-        setMsg(sellMsg, "Submitting…", null);
+        setMsg(sellMsg, gettext("Submitting…"), null);
         var body = {status: mode === "sell" ? "p" : "n", positions: positions};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
@@ -996,8 +1000,10 @@
             // still need to know how much to actually collect from the
             // customer standing right there - losing that number the moment
             // the sale completes was the whole problem being fixed here.
-            setMsg(sellMsg, (mode === "sell" ? "Sold" : "Reserved") + " — order " + res.data.code +
-                ", total " + res.data.total + ".", "success");
+            var doneMsg = mode === "sell"
+                ? interpolate(gettext("Sold — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true)
+                : interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true);
+            setMsg(sellMsg, doneMsg, "success");
             if (mode === "sell") addToTill(method, res.data.total);
             cart = [];
             activeSeatItem = null;
@@ -1025,7 +1031,7 @@
             loadDefaultOrderList();
             return;
         }
-        searchResultsEl.textContent = "Searching…";
+        searchResultsEl.textContent = gettext("Searching…");
         api(eventPath("/orders/?search=" + encodeURIComponent(q) + "&ordering=-datetime")).then(function (res) {
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
@@ -1075,7 +1081,7 @@
     // can browse rather than always having to know a code/name/e-mail
     // upfront - sorted with whatever most likely still needs attention first.
     function loadDefaultOrderList() {
-        searchResultsEl.textContent = "Loading…";
+        searchResultsEl.textContent = gettext("Loading…");
         api(eventPath("/orders/?ordering=-datetime")).then(function (res) {
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
@@ -1094,13 +1100,13 @@
     function orderCustomerLabel(o) {
         if (o.email) return o.email;
         var named = (o.positions || []).find(function (p) { return p.attendee_name; });
-        return named ? named.attendee_name : "no e-mail";
+        return named ? named.attendee_name : gettext("no e-mail");
     }
 
     function renderSearchResults(orders) {
         searchResultsEl.innerHTML = "";
         if (!orders.length) {
-            searchResultsEl.textContent = "No matching orders.";
+            searchResultsEl.textContent = gettext("No matching orders.");
             return;
         }
         orders.forEach(function (o) {
@@ -1115,10 +1121,12 @@
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = pendingSum(o);
-            div.appendChild(document.createTextNode(
-                " — " + orderCustomerLabel(o) + " — " + o.status + " — total " + o.total +
-                (parseFloat(pending) > 0 ? ", pending " + pending : "")
-            ));
+            var line = " — " + orderCustomerLabel(o) + " — " + o.status + " — " +
+                interpolate(gettext("total %(total)s"), {total: o.total}, true);
+            if (parseFloat(pending) > 0) {
+                line += ", " + interpolate(gettext("pending %(amount)s"), {amount: pending}, true);
+            }
+            div.appendChild(document.createTextNode(line));
             div.addEventListener("click", function () { loadOrderDetail(o.code); });
             searchResultsEl.appendChild(div);
         });
@@ -1149,7 +1157,7 @@
 
     function positionLabel(p) {
         var it = itemsById[p.item];
-        var name = it ? pickI18n(it.name) : ("Item #" + p.item);
+        var name = it ? pickI18n(it.name) : interpolate(gettext("Item #%(id)s"), {id: p.item}, true);
         if (p.variation && it) {
             var v = (it.variations || []).find(function (vv) { return vv.id === p.variation; });
             if (v) name += " (" + pickI18n(v.value) + ")";
@@ -1200,7 +1208,7 @@
                 badge.textContent = pos.seat.name || pos.seat.seat_guid;
             } else {
                 badge.className = "pos-seat-badge pos-seat-missing";
-                badge.textContent = "no seat";
+                badge.textContent = gettext("no seat");
             }
             row.appendChild(badge);
 
@@ -1241,7 +1249,10 @@
 
         var pending = pendingSum(order);
         var p = document.createElement("p");
-        p.textContent = "Total: " + order.total + (parseFloat(pending) > 0 ? " — pending: " + pending : " — fully paid");
+        p.textContent = interpolate(gettext("Total: %(total)s"), {total: order.total}, true) +
+            (parseFloat(pending) > 0
+                ? interpolate(gettext(" — pending: %(amount)s"), {amount: pending}, true)
+                : gettext(" — fully paid"));
         orderDetailEl.appendChild(p);
 
         var list = document.createElement("div");
@@ -1261,7 +1272,7 @@
             var payBtn = document.createElement("button");
             payBtn.type = "button";
             payBtn.className = "pos-btn-primary";
-            payBtn.textContent = "Take payment";
+            payBtn.textContent = gettext("Take payment");
             payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
 
             // Taking cash before every seatable position actually has a seat
@@ -1276,7 +1287,7 @@
             if (!seated) {
                 var seatHint = document.createElement("p");
                 seatHint.className = "pos-hint";
-                seatHint.textContent = "Assign a seat to every position (for every date) before taking payment.";
+                seatHint.textContent = gettext("Assign a seat to every position (for every date) before taking payment.");
                 orderDetailEl.appendChild(seatHint);
             }
         }
@@ -1311,17 +1322,17 @@
             orderSeats = info.results;
             orderSeatmapWrapEl.innerHTML = "";
             if (info.noDate) {
-                orderSeatmapWrapEl.textContent = "Choose a date above to place seats for that date.";
+                orderSeatmapWrapEl.textContent = gettext("Choose a date above to place seats for that date.");
                 return;
             }
             if (!orderSeats.length) {
-                orderSeatmapWrapEl.textContent = "This date has no seated positions.";
+                orderSeatmapWrapEl.textContent = gettext("This date has no seated positions.");
                 return;
             }
 
             var hint = document.createElement("p");
             hint.className = "pos-hint";
-            hint.textContent = "This order's own seats (for the date selected above) are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.";
+            hint.textContent = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
             orderSeatmapWrapEl.appendChild(hint);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -1331,7 +1342,7 @@
 
             var placeBtn = document.createElement("button");
             placeBtn.type = "button";
-            placeBtn.textContent = "Place selected seats on checked positions";
+            placeBtn.textContent = gettext("Place selected seats on checked positions");
             placeBtn.style.marginTop = "10px";
             orderSeatmapWrapEl.appendChild(placeBtn);
             orderSeatmapWrapEl.appendChild(placeMsg);
@@ -1349,7 +1360,7 @@
         var msg = document.createElement("div");
         msg.className = "pos-msg";
         orderDetailEl.appendChild(msg);
-        setMsg(msg, "Charging…", null);
+        setMsg(msg, gettext("Charging…"), null);
         // Captured before the request, not re-read afterwards - by the time
         // this resolves the order's own pending sum will be zero (it's just
         // been paid), so this is the one place that actually knows how much
@@ -1380,8 +1391,18 @@
         cancelStalePayments().then(function (results) {
             var failed = results.filter(function (r) { return !r.res.ok; });
             if (failed.length) {
-                setMsg(msg, "Could not cancel " + failed.length + " pending payment(s), continuing anyway: " +
-                    failed.map(function (r) { return describeError(r.res.data); }).join("; "), "error");
+                setMsg(msg, interpolate(
+                    ngettext(
+                        "Could not cancel %(count)s pending payment, continuing anyway: %(errors)s",
+                        "Could not cancel %(count)s pending payments, continuing anyway: %(errors)s",
+                        failed.length
+                    ),
+                    {
+                        count: failed.length,
+                        errors: failed.map(function (r) { return describeError(r.res.data); }).join("; "),
+                    },
+                    true
+                ), "error");
             }
             return api(eventPath("/orders/" + order.code + "/payments/"), {
                 method: "POST",
@@ -1493,7 +1514,9 @@
         function renderPlaceBtn() {
             var n = Object.keys(placementPool).length;
             var checked = Array.prototype.slice.call(positionListEl.querySelectorAll("input[type=checkbox]:checked"));
-            placeBtn.textContent = "Place " + n + " selected seat(s) on " + checked.length + " checked position(s)";
+            var seatsPart = interpolate(ngettext("%(n)s selected seat", "%(n)s selected seats", n), {n: n}, true);
+            var positionsPart = interpolate(ngettext("%(n)s checked position", "%(n)s checked positions", checked.length), {n: checked.length}, true);
+            placeBtn.textContent = interpolate(gettext("Place %(seats)s on %(positions)s"), {seats: seatsPart, positions: positionsPart}, true);
             placeBtn.disabled = n === 0 || checked.length === 0;
         }
         positionListEl.addEventListener("change", renderPlaceBtn);
@@ -1680,12 +1703,20 @@
             if (!n) return;
             poolSeats.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });
             placeBtn.disabled = true;
-            setMsg(msgEl, "Placing seats one by one - this is not a single atomic action, a failure partway through leaves earlier placements in place…", null);
+            setMsg(msgEl, gettext("Placing seats one by one - this is not a single atomic action, a failure partway through leaves earlier placements in place…"), null);
 
             var i = 0, ok = 0, failed = [];
             function next() {
                 if (i >= n) {
-                    setMsg(msgEl, "Placed " + ok + "/" + n + " seat(s)." + (failed.length ? " Failed: " + failed.join("; ") : ""), failed.length ? "error" : "success");
+                    var resultMsg = interpolate(
+                        ngettext("Placed %(ok)s/%(n)s seat.", "Placed %(ok)s/%(n)s seats.", n),
+                        {ok: ok, n: n},
+                        true
+                    );
+                    if (failed.length) {
+                        resultMsg += " " + interpolate(gettext("Failed: %(errors)s"), {errors: failed.join("; ")}, true);
+                    }
+                    setMsg(msgEl, resultMsg, failed.length ? "error" : "success");
                     placementPool = {};
                     renderPositionList(positionListEl);
                     render();
@@ -1715,7 +1746,7 @@
         // this map in place after a move instead of the whole order detail
         // having to be refetched and rebuilt - see applyPositionSeat().
         function movePositionSeat(position, seatGuid) {
-            setMsg(msgEl, "Moving seat…", null);
+            setMsg(msgEl, gettext("Moving seat…"), null);
             api(eventPath("/orderpositions/" + position.id + "/"), {
                 method: "PATCH",
                 body: JSON.stringify({seat: seatGuid}),
@@ -1724,7 +1755,7 @@
                     setMsg(msgEl, describeError(res.data), "error");
                     return;
                 }
-                setMsg(msgEl, "Seat moved.", "success");
+                setMsg(msgEl, gettext("Seat moved."), "success");
                 applyPositionSeat(position.id, res.data.seat);
                 renderPositionList(positionListEl);
                 render();
@@ -1736,7 +1767,7 @@
         // to unassign (confirmed in orderchange.py: it goes through
         // OrderChangeManager.change_seat(position, None), same as a real move).
         function unassignSeat(position) {
-            setMsg(msgEl, "Removing seat…", null);
+            setMsg(msgEl, gettext("Removing seat…"), null);
             api(eventPath("/orderpositions/" + position.id + "/"), {
                 method: "PATCH",
                 body: JSON.stringify({seat: null}),
@@ -1745,7 +1776,7 @@
                     setMsg(msgEl, describeError(res.data), "error");
                     return;
                 }
-                setMsg(msgEl, "Seat removed.", "success");
+                setMsg(msgEl, gettext("Seat removed."), "success");
                 applyPositionSeat(position.id, null);
                 renderPositionList(positionListEl);
                 render();
@@ -1776,7 +1807,7 @@
                 var pos = blockPositions[i];
                 var seat = seats.find(function (s) { return s.guid === pos.seat.seat_guid; });
                 if (!seat) {
-                    setMsg(msgEl, "Cannot move block: a seat's location is unknown.", "error");
+                    setMsg(msgEl, gettext("Cannot move block: a seat's location is unknown."), "error");
                     return;
                 }
                 var wantX = seat.x + dx, wantY = seat.y + dy;
@@ -1784,22 +1815,30 @@
                     return Math.abs(s.x - wantX) < TOL && Math.abs(s.y - wantY) < TOL;
                 });
                 if (!dest) {
-                    setMsg(msgEl, "Cannot move block: target position is outside the seating plan.", "error");
+                    setMsg(msgEl, gettext("Cannot move block: target position is outside the seating plan."), "error");
                     return;
                 }
                 if (dest.status !== "free" && !blockGuids[dest.guid]) {
-                    setMsg(msgEl, "Cannot move block: seat at the target position is already taken.", "error");
+                    setMsg(msgEl, gettext("Cannot move block: seat at the target position is already taken."), "error");
                     return;
                 }
                 if (targetGuidsUsed[dest.guid]) {
-                    setMsg(msgEl, "Cannot move block: target seats overlap.", "error");
+                    setMsg(msgEl, gettext("Cannot move block: target seats overlap."), "error");
                     return;
                 }
                 targetGuidsUsed[dest.guid] = true;
                 moves.push({position: pos, targetGuid: dest.guid});
             }
 
-            setMsg(msgEl, "Moving " + moves.length + " seat(s) - this is not a single atomic action, a failure partway through leaves it partially done…", null);
+            setMsg(msgEl, interpolate(
+                ngettext(
+                    "Moving %(n)s seat - this is not a single atomic action, a failure partway through leaves it partially done…",
+                    "Moving %(n)s seats - this is not a single atomic action, a failure partway through leaves it partially done…",
+                    moves.length
+                ),
+                {n: moves.length},
+                true
+            ), null);
 
             // Clear every seat in the block first, then assign the new ones -
             // avoids "seat already taken" conflicts when the block shifts onto
@@ -1823,7 +1862,7 @@
             }
             function assignNext() {
                 if (idx >= moves.length) {
-                    setMsg(msgEl, "Block moved.", "success");
+                    setMsg(msgEl, gettext("Block moved."), "success");
                     renderPositionList(positionListEl);
                     render();
                     return;
@@ -1837,7 +1876,7 @@
                     if (res.ok) {
                         applyPositionSeat(m.position.id, res.data.seat);
                     } else {
-                        setMsg(msgEl, "Some seats failed to move: " + describeError(res.data), "error");
+                        setMsg(msgEl, interpolate(gettext("Some seats failed to move: %(error)s"), {error: describeError(res.data)}, true), "error");
                     }
                     assignNext();
                 });
