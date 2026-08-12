@@ -106,11 +106,26 @@
                 </div>
 
                 <nav id="pos-tabs">
-                    <button type="button" class="pos-tab active" data-tab="sell">{% trans "Sell / Reserve" %}</button>
-                    <button type="button" class="pos-tab" data-tab="find">{% trans "Find order" %}</button>
+                    <button type="button" class="pos-tab active" data-tab="quick">{% trans "Quick reservation" %}</button>
+                    <button type="button" class="pos-tab" data-tab="sell">{% trans "Sell / Reserve" %}</button>
+                    <button type="button" class="pos-tab" data-tab="find">{% trans "Edit order" %}</button>
                 </nav>
 
-                <div id="pos-tab-sell" class="pos-tab-panel">
+                <div id="pos-tab-quick" class="pos-tab-panel">
+                    <p class="pos-hint">{% blocktrans %}For orders taken by phone or in person, without picking seats or taking payment now - enter how many of each product for each date, then reserve. Seats (if this event uses them) can be assigned later from the Edit order tab.{% endblocktrans %}</p>
+                    <div id="pos-quick-table" class="pos-msg">{% trans "Loading…" %}</div>
+                    <label for="pos-quick-email">{% trans "Customer e-mail" %} ({% trans "optional" %})</label>
+                    <input type="email" id="pos-quick-email">
+                    <label for="pos-quick-name">{% trans "Customer name" %} ({% trans "optional" %})</label>
+                    <input type="text" id="pos-quick-name">
+                    <p class="pos-hint">{% trans "Reserving requires an e-mail or a name, so the order can be found again later." %}</p>
+                    <div class="pos-actions">
+                        <button id="pos-quick-btn-reserve" type="button" class="pos-btn-primary">{% trans "Reserve" %}</button>
+                    </div>
+                    <div id="pos-quick-msg" class="pos-msg"></div>
+                </div>
+
+                <div id="pos-tab-sell" class="pos-tab-panel" hidden>
                     <div class="pos-columns">
                         <div class="pos-col pos-col-items">
                             <h2>{% trans "Items" %}</h2>

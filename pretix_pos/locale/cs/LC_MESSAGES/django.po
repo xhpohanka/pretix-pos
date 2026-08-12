@@ -159,13 +159,25 @@ msgstr "Zavřít"
 msgid "Date"
 msgstr "Termín"
 
-#: templates/pretix_pos/organizer/pos.html:108
+#: templates/pretix_pos/organizer/pos.html:109
+msgid "Quick reservation"
+msgstr "Rychlá rezervace"
+
+#: templates/pretix_pos/organizer/pos.html:115
+msgid "For orders taken by phone or in person, without picking seats or taking payment now - enter how many of each product for each date, then reserve. Seats (if this event uses them) can be assigned later from the Edit order tab."
+msgstr "Pro objednávky přijaté telefonicky nebo osobně, bez výběru míst nebo okamžité platby - zadejte počet kusů každé položky pro každý termín a rezervujte. Místa (pokud tato akce sezení používá) lze přiřadit později v záložce Upravit objednávku."
+
+#: templates/pretix_pos/organizer/pos.html:121
+msgid "Reserving requires an e-mail or a name, so the order can be found again later."
+msgstr "Rezervace vyžaduje e-mail nebo jméno, aby bylo možné objednávku později znovu najít."
+
+#: templates/pretix_pos/organizer/pos.html:110
 msgid "Sell / Reserve"
 msgstr "Prodat / Rezervovat"
 
-#: templates/pretix_pos/organizer/pos.html:109
-msgid "Find order"
-msgstr "Najít objednávku"
+#: templates/pretix_pos/organizer/pos.html:110
+msgid "Edit order"
+msgstr "Upravit objednávku"
 
 #: templates/pretix_pos/organizer/pos.html:115
 msgid "Items"

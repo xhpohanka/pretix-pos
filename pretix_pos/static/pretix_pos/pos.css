@@ -27,6 +27,12 @@ button.pos-btn-primary {
     color: #fff;
 }
 
+button.pos-btn-danger {
+    background: #fff;
+    border-color: #c62828;
+    color: #c62828;
+}
+
 input[type=text], input[type=email], select {
     font: inherit;
     padding: 7px 9px;
@@ -258,7 +264,8 @@ button.pos-tab.active {
 .pos-position-row input[type=checkbox] { width: auto; }
 
 .pos-position-row-other-date { opacity: 0.55; }
-.pos-date-badge { background: #cfe3f7; }
+.pos-date-badge { background: #cfe3f7; cursor: pointer; }
+.pos-date-badge:hover { background: #b3d2ee; }
 
 .pos-seat-badge {
     display: inline-block;
@@ -269,6 +276,36 @@ button.pos-tab.active {
 }
 
 .pos-seat-badge.pos-seat-missing { background: #ffe0b2; }
+
+.pos-quick-table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.pos-quick-table th, .pos-quick-table td {
+    border: 1px solid #e0e0e0;
+    padding: 6px 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.pos-quick-table input.pos-quick-qty {
+    width: 70px;
+    max-width: none;
+    display: inline-block;
+}
+
+.pos-quick-price {
+    margin-left: 6px;
+    color: #666;
+    font-size: 12px;
+}
+
+.pos-quick-cell-disabled {
+    color: #999;
+    text-align: center;
+}
 
 .pos-rubber-band {
     fill: rgba(51, 122, 183, 0.15);

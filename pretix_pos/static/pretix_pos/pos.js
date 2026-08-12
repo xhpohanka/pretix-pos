@@ -21,6 +21,8 @@
     var orderSeats = [];
     var subeventPriceOverrides = {}; // subeventId -> {items: {itemId: price}, variations: {variationId: price}}
     var subeventSeatingPlans = {}; // subeventId -> true if that date has a seating plan at all
+    var subeventDisabled = {}; // subeventId -> {items: {itemId: true}, variations: {variationId: true}}
+    var subeventsList = []; // raw API results, ordered - used by the Quick reservation tab
 
     function loadState() {
         try {
@@ -430,6 +432,7 @@
 
     var tabs = Array.prototype.slice.call(document.querySelectorAll(".pos-tab"));
     var panels = {
+        quick: document.getElementById("pos-tab-quick"),
         sell: document.getElementById("pos-tab-sell"),
         find: document.getElementById("pos-tab-find"),
     };
@@ -516,10 +519,11 @@
         loadItemsIndex().then(function () {
             if (state.event.hasSubevents) {
                 subeventBar.hidden = false;
-                loadSubevents();
+                loadSubevents().then(loadQuickReservationTab);
             } else {
                 subeventBar.hidden = true;
                 loadForCurrentContext();
+                loadQuickReservationTab();
             }
         });
     }
@@ -537,10 +541,12 @@
 
     function loadSubevents() {
         subeventSelect.innerHTML = "";
-        api(eventPath("/subevents/?active=true&ordering=date_from")).then(function (res) {
+        return api(eventPath("/subevents/?active=true&ordering=date_from")).then(function (res) {
             var subs = (res.ok && res.data && res.data.results) || [];
+            subeventsList = subs;
             subeventPriceOverrides = {};
             subeventSeatingPlans = {};
+            subeventDisabled = {};
             subs.forEach(function (se) {
                 var opt = document.createElement("option");
                 opt.value = se.id;
@@ -557,13 +563,17 @@
                 // default_price - needed to show a genuinely final total instead
                 // of hedging with "estimated" (see priceFor()).
                 var items = {}, variations = {};
+                var disabledItems = {}, disabledVariations = {};
                 (se.item_price_overrides || []).forEach(function (o) {
                     if (o.price != null) items[o.item] = o.price;
+                    if (o.disabled) disabledItems[o.item] = true;
                 });
                 (se.variation_price_overrides || []).forEach(function (o) {
                     if (o.price != null) variations[o.variation] = o.price;
+                    if (o.disabled) disabledVariations[o.variation] = true;
                 });
                 subeventPriceOverrides[se.id] = {items: items, variations: variations};
+                subeventDisabled[se.id] = {items: disabledItems, variations: disabledVariations};
             });
             loadForCurrentContext();
         });
@@ -1017,6 +1027,235 @@
     btnReserve.addEventListener("click", function () { submitOrder("reserve"); });
     btnSell.addEventListener("click", function () { submitOrder("sell"); });
 
+    // ----------------------------------------------------- quick reservation tab
+
+    // For phone/in-person orders where nobody is picking exact seats or paying
+    // right now - one row per date, one quantity input per item (or per
+    // variation, for items that have any) - same shape as the eshop's own
+    // quantity selector for a date that doesn't have customer seat-choice
+    // enabled. Seats (if any) get assigned later from the Edit order tab, same
+    // as any other manually-seated reservation.
+    var quickTableEl = document.getElementById("pos-quick-table");
+    var quickEmailInput = document.getElementById("pos-quick-email");
+    var quickNameInput = document.getElementById("pos-quick-name");
+    var quickBtnReserve = document.getElementById("pos-quick-btn-reserve");
+    var quickMsg = document.getElementById("pos-quick-msg");
+
+    function quickOrderableUnits() {
+        // Same active-item filter as loadSellItems() - one unit per variation
+        // for items that have any, one unit for the item itself otherwise.
+        var units = [];
+        Object.keys(itemsById).map(function (id) { return itemsById[id]; })
+            .filter(function (it) { return it.active; })
+            .sort(function (a, b) { return (a.position || 0) - (b.position || 0); })
+            .forEach(function (it) {
+                var variations = (it.variations || []).filter(function (v) { return v.active; });
+                if (variations.length) {
+                    variations.forEach(function (v) {
+                        units.push({itemId: it.id, variationId: v.id, label: pickI18n(it.name) + " – " + pickI18n(v.value)});
+                    });
+                } else {
+                    units.push({itemId: it.id, variationId: null, label: pickI18n(it.name)});
+                }
+            });
+        return units;
+    }
+
+    function loadQuickReservationTab() {
+        quickTableEl.innerHTML = "";
+        var units = quickOrderableUnits();
+        if (!units.length) {
+            quickTableEl.textContent = gettext("No items available.");
+            return;
+        }
+        // Events without subevents get a single implicit row (subeventId null) -
+        // priceFor()/isDisabledFor() already treat that the same as "no override".
+        var rows = state.event.hasSubevents ? subeventsList : [null];
+        if (!rows.length) {
+            quickTableEl.textContent = gettext("No dates available.");
+            return;
+        }
+
+        var table = document.createElement("table");
+        table.className = "pos-quick-table";
+        var thead = document.createElement("thead");
+        var headRow = document.createElement("tr");
+        if (state.event.hasSubevents) {
+            var dateTh = document.createElement("th");
+            dateTh.textContent = gettext("Date");
+            headRow.appendChild(dateTh);
+        }
+        units.forEach(function (u) {
+            var th = document.createElement("th");
+            th.textContent = u.label;
+            headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement("tbody");
+        rows.forEach(function (se) {
+            var seId = se ? se.id : null;
+            var tr = document.createElement("tr");
+            if (state.event.hasSubevents) {
+                var dateTd = document.createElement("td");
+                dateTd.textContent = pickI18n(se.name) + " — " + new Date(se.date_from).toLocaleString();
+                tr.appendChild(dateTd);
+            }
+            units.forEach(function (u) {
+                var td = document.createElement("td");
+                var disabledMap = subeventDisabled[seId] || {items: {}, variations: {}};
+                var disabled = u.variationId
+                    ? disabledMap.variations[u.variationId]
+                    : disabledMap.items[u.itemId];
+                if (disabled) {
+                    td.className = "pos-quick-cell-disabled";
+                    td.textContent = "—";
+                } else {
+                    var input = document.createElement("input");
+                    input.type = "number";
+                    input.min = "0";
+                    input.value = "0";
+                    input.className = "pos-quick-qty";
+                    input.dataset.itemId = u.itemId;
+                    if (u.variationId) input.dataset.variationId = u.variationId;
+                    if (seId != null) input.dataset.subeventId = seId;
+                    td.appendChild(input);
+                    var price = document.createElement("span");
+                    price.className = "pos-quick-price";
+                    price.textContent = fmtMoney(priceFor(u.itemId, u.variationId, seId));
+                    td.appendChild(price);
+                }
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        quickTableEl.appendChild(table);
+    }
+
+    function buildQuickPositions() {
+        var positions = [];
+        Array.prototype.slice.call(quickTableEl.querySelectorAll(".pos-quick-qty")).forEach(function (input) {
+            var n = parseInt(input.value, 10) || 0;
+            for (var i = 0; i < n; i++) {
+                var p = {item: parseInt(input.dataset.itemId, 10)};
+                if (input.dataset.variationId) p.variation = parseInt(input.dataset.variationId, 10);
+                if (input.dataset.subeventId) p.subevent = parseInt(input.dataset.subeventId, 10);
+                positions.push(p);
+            }
+        });
+        return positions;
+    }
+
+    // The public order-create API unconditionally rejects a position for a
+    // seated product unless it already carries a seat (see OrderCreateSerializer
+    // in pretix core - it has no "seat later" affordance at all, unlike the
+    // eshop's own manual-assignment checkout, which never goes through this
+    // endpoint). So to create the reservation at all, every seated position
+    // here first grabs whichever free seat comes first for its item/date, then
+    // gets that seat unassigned again right after creation (same PATCH
+    // {seat: null} as unassignSeat() below) - landing the order in the exact
+    // same "needs seating" queue as any other manually-assigned reservation,
+    // per the Edit order tab, instead of holding a seat staff never chose.
+    function assignQuickSeats(positions) {
+        if (!window.PretixSeatingRenderer) return Promise.resolve(true);
+        var bySubevent = {};
+        positions.forEach(function (p) {
+            var key = p.subevent || "_";
+            (bySubevent[key] = bySubevent[key] || []).push(p);
+        });
+        return Promise.all(Object.keys(bySubevent).map(function (key) {
+            var seId = key === "_" ? null : parseInt(key, 10);
+            var group = bySubevent[key];
+            return apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/")).then(function (res) {
+                var seats = (res.ok && res.data && res.data.results) || [];
+                var freeByItem = {};
+                seats.forEach(function (s) {
+                    if (s.status !== "free") return;
+                    (freeByItem[s.product] = freeByItem[s.product] || []).push(s.seat_guid);
+                });
+                var ok = true;
+                group.forEach(function (p) {
+                    var pool = freeByItem[p.item];
+                    if (!pool) return;
+                    if (!pool.length) { ok = false; return; }
+                    p.seat = pool.shift();
+                });
+                return ok;
+            });
+        })).then(function (results) { return results.every(Boolean); });
+    }
+
+    function submitQuickReservation() {
+        var positions = buildQuickPositions();
+        if (!positions.length) {
+            setMsg(quickMsg, gettext("Enter a quantity greater than zero for at least one item/date."), "error");
+            return;
+        }
+        var email = quickEmailInput.value.trim();
+        var name = quickNameInput.value.trim();
+        // Same reasoning as the Sell/Reserve tab's own reservations - this
+        // always stays unpaid until the customer/staff comes back to finish it,
+        // so something has to identify whose it is.
+        if (!email && !name) {
+            setMsg(quickMsg, gettext("Enter an e-mail or a name before reserving - otherwise there's no way to find this order again later."), "error");
+            return;
+        }
+        if (name) positions.forEach(function (p) { p.attendee_name = name; });
+        quickBtnReserve.disabled = true;
+        setMsg(quickMsg, gettext("Submitting…"), null);
+        assignQuickSeats(positions).then(function (enough) {
+            if (!enough) {
+                quickBtnReserve.disabled = false;
+                setMsg(quickMsg, gettext("Not enough free seats left for one of these dates/items - try a smaller quantity."), "error");
+                return;
+            }
+            var body = {status: "n", positions: positions};
+            if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
+            if (email) body.email = email;
+            api(eventPath("/orders/"), {method: "POST", body: JSON.stringify(body)}).then(function (res) {
+                if (!res.ok) {
+                    quickBtnReserve.disabled = false;
+                    setMsg(quickMsg, describeError(res.data), "error");
+                    return;
+                }
+                var seated = res.data.positions.filter(function (p) { return p.seat; });
+                // Sequential, not Promise.all - concurrent PATCHes against
+                // positions of the *same* order race on OrderChangeManager's
+                // optimistic lock (see commit() in orders.py, which compares
+                // Order.last_modified under select_for_update) and the loser
+                // fails with a race-condition error, silently leaving that
+                // seat assigned since nothing here checked res.ok before.
+                var releaseNext = function (i) {
+                    if (i >= seated.length) return Promise.resolve(true);
+                    return api(eventPath("/orderpositions/" + seated[i].id + "/"), {
+                        method: "PATCH", body: JSON.stringify({seat: null}),
+                    }).then(function (res2) {
+                        if (!res2.ok) return false;
+                        return releaseNext(i + 1);
+                    });
+                };
+                releaseNext(0).then(function (allReleased) {
+                    quickBtnReserve.disabled = false;
+                    if (!allReleased) {
+                        setMsg(quickMsg, interpolate(gettext("Reserved — order %(code)s, total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."), {code: res.data.code, total: res.data.total}, true), "error");
+                        quickEmailInput.value = "";
+                        quickNameInput.value = "";
+                        loadQuickReservationTab();
+                        return;
+                    }
+                    setMsg(quickMsg, interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true), "success");
+                    quickEmailInput.value = "";
+                    quickNameInput.value = "";
+                    loadQuickReservationTab();
+                });
+            });
+        });
+    }
+
+    quickBtnReserve.addEventListener("click", submitQuickReservation);
+
     // --------------------------------------------------------------- find tab
 
     var searchInput = document.getElementById("pos-search");
@@ -1024,6 +1263,27 @@
     var searchResultsEl = document.getElementById("pos-search-results");
     var orderDetailEl = document.getElementById("pos-order-detail");
     var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
+
+    // Set by renderOrderDetail() (only while the loaded order is still "n"/pending),
+    // kept at module level so seat placement/move/removal - all in initOrderSeatMap(),
+    // a separate function - can re-enable "Take payment" without a full
+    // loadOrderDetail() reload. null whenever no such button is currently on screen.
+    var payBtn = null;
+    var payMethodSelect = null;
+    var seatHintEl = null;
+
+    // Placing/moving/removing a seat changes whether the order is fully seated, but
+    // deliberately doesn't reload the whole order detail panel (see the comment on
+    // applyPositionSeat()) - so the "Take payment" button's disabled state, set once
+    // when the panel was first rendered, would otherwise go stale until a manual
+    // refresh. Call this after every seat mutation instead.
+    function refreshPayButtonState() {
+        if (!payBtn || !currentOrder) return;
+        var seated = orderIsSeated(currentOrder);
+        if (payMethodSelect) payMethodSelect.disabled = !seated;
+        payBtn.disabled = !seated;
+        if (seatHintEl) seatHintEl.hidden = seated;
+    }
 
     function doSearch() {
         var q = searchInput.value.trim();
@@ -1195,10 +1455,19 @@
             label.textContent = positionLabel(pos);
             row.appendChild(label);
 
-            if (otherDate) {
+            // Shown for every position, not just other-date ones (an order with a
+            // single date still benefits from seeing which one it is) - clicking it
+            // switches the date bar at the top, which re-renders this whole panel
+            // (see subeventSelect's change handler) so its seatmap comes on screen.
+            if (state.event.hasSubevents) {
                 var dateBadge = document.createElement("span");
                 dateBadge.className = "pos-seat-badge pos-date-badge";
                 dateBadge.textContent = subeventLabel(pos.subevent);
+                dateBadge.title = gettext("Click to switch to this date's seating plan.");
+                dateBadge.addEventListener("click", function () {
+                    subeventSelect.value = pos.subevent;
+                    subeventSelect.dispatchEvent(new Event("change"));
+                });
                 row.appendChild(dateBadge);
             }
 
@@ -1242,9 +1511,15 @@
         orderDetailEl.innerHTML = "";
         orderSeatmapWrapEl.innerHTML = "";
         var order = currentOrder;
+        // innerHTML = "" above already detached whatever these pointed to from a
+        // previous render - drop the references too so refreshPayButtonState()
+        // doesn't touch detached nodes for an order that's no longer "n"/pending.
+        payBtn = null;
+        payMethodSelect = null;
+        seatHintEl = null;
 
         var h = document.createElement("h3");
-        h.textContent = order.code + " — " + order.status;
+        h.textContent = order.code + " — " + orderCustomerLabel(order) + " — " + order.status;
         orderDetailEl.appendChild(h);
 
         var pending = pendingSum(order);
@@ -1260,7 +1535,7 @@
         orderDetailEl.appendChild(list);
 
         if (order.status === "n") {
-            var payMethodSelect = document.createElement("select");
+            payMethodSelect = document.createElement("select");
             PAYMENT_METHODS.forEach(function (m) {
                 var opt = document.createElement("option");
                 opt.value = m.value;
@@ -1269,27 +1544,39 @@
             });
             orderDetailEl.appendChild(payMethodSelect);
 
-            var payBtn = document.createElement("button");
+            payBtn = document.createElement("button");
             payBtn.type = "button";
             payBtn.className = "pos-btn-primary";
             payBtn.textContent = gettext("Take payment");
             payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
-
-            // Taking cash before every seatable position actually has a seat
-            // risks collecting money for a seat that turns out not to exist -
-            // orderIsSeated() is already used to sort/color the Find order
-            // list, reused here to gate the button itself rather than just
-            // hinting at it.
-            var seated = orderIsSeated(order);
-            payMethodSelect.disabled = !seated;
-            payBtn.disabled = !seated;
             orderDetailEl.appendChild(payBtn);
-            if (!seated) {
-                var seatHint = document.createElement("p");
-                seatHint.className = "pos-hint";
-                seatHint.textContent = gettext("Assign a seat to every position (for every date) before taking payment.");
-                orderDetailEl.appendChild(seatHint);
-            }
+
+            seatHintEl = document.createElement("p");
+            seatHintEl.className = "pos-hint";
+            seatHintEl.textContent = gettext("Assign a seat to every position (for every date) before taking payment.");
+            orderDetailEl.appendChild(seatHintEl);
+
+            // Taking cash before every seatable position actually has a seat risks
+            // collecting money for a seat that turns out not to exist -
+            // orderIsSeated() is already used to sort/color the Edit order list,
+            // reused here to gate the button itself rather than just hinting at it.
+            // Also re-run after every seat placement/move/removal - see
+            // refreshPayButtonState().
+            refreshPayButtonState();
+        }
+
+        if (order.status !== "c") {
+            var cancelMsg = document.createElement("div");
+            cancelMsg.className = "pos-msg";
+
+            var cancelBtn = document.createElement("button");
+            cancelBtn.type = "button";
+            cancelBtn.className = "pos-btn-danger";
+            cancelBtn.style.marginTop = "10px";
+            cancelBtn.textContent = gettext("Cancel entire order");
+            cancelBtn.addEventListener("click", function () { cancelOrder(order, cancelBtn, cancelMsg); });
+            orderDetailEl.appendChild(cancelBtn);
+            orderDetailEl.appendChild(cancelMsg);
         }
 
         // The seatmap always follows whichever date is selected in the bar at
@@ -1429,6 +1716,23 @@
             // before this payment. Re-runs whatever's currently shown
             // (default browse list or an active search), same as any other
             // trigger for that list.
+            doSearch();
+        });
+    }
+
+    function cancelOrder(order, btn, msg) {
+        if (!window.confirm(gettext("Cancel this entire order? This cannot be undone."))) return;
+        btn.disabled = true;
+        setMsg(msg, gettext("Canceling…"), null);
+        api(eventPath("/orders/" + order.code + "/mark_canceled/"), {method: "POST"}).then(function (res) {
+            if (!res.ok) {
+                btn.disabled = false;
+                setMsg(msg, describeError(res.data), "error");
+                return;
+            }
+            loadOrderDetail(order.code);
+            // Same reasoning as payOrder()'s doSearch() call - the left-hand list
+            // still shows this order's pre-cancellation status/color otherwise.
             doSearch();
         });
     }
@@ -1721,6 +2025,7 @@
                     renderPositionList(positionListEl);
                     render();
                     renderPlaceBtn();
+                    refreshPayButtonState();
                     return;
                 }
                 var seat = poolSeats[i];
@@ -1759,6 +2064,7 @@
                 applyPositionSeat(position.id, res.data.seat);
                 renderPositionList(positionListEl);
                 render();
+                refreshPayButtonState();
             });
         }
 
@@ -1781,6 +2087,7 @@
                 renderPositionList(positionListEl);
                 render();
                 renderPlaceBtn();
+                refreshPayButtonState();
             });
         }
 
@@ -1865,6 +2172,7 @@
                     setMsg(msgEl, gettext("Block moved."), "success");
                     renderPositionList(positionListEl);
                     render();
+                    refreshPayButtonState();
                     return;
                 }
                 var m = moves[idx];

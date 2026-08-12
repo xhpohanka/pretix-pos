@@ -77,6 +77,26 @@ msgid "No items available."
 msgstr "Nejsou k dispozici žádné položky."
 
 #: static/pretix_pos/pos.js
+msgid "No dates available."
+msgstr "Nejsou k dispozici žádné termíny."
+
+#: static/pretix_pos/pos.js
+msgid "Date"
+msgstr "Termín"
+
+#: static/pretix_pos/pos.js
+msgid "Enter a quantity greater than zero for at least one item/date."
+msgstr "Zadejte počet větší než nula alespoň pro jednu položku/termín."
+
+#: static/pretix_pos/pos.js
+msgid "Not enough free seats left for one of these dates/items - try a smaller quantity."
+msgstr "Pro některou z těchto položek/termínů už není dostatek volných míst - zkuste menší počet."
+
+#: static/pretix_pos/pos.js
+msgid "Reserved — order %(code)s, total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."
+msgstr "Rezervováno — objednávka %(code)s, celkem %(total)s - ale nepodařilo se uvolnit všechna zástupná místa, zkontrolujte záložku Upravit objednávku."
+
+#: static/pretix_pos/pos.js
 msgid "%(name)s (%(price)s) — seated"
 msgstr "%(name)s (%(price)s) — se sezením"
 
@@ -194,6 +214,22 @@ msgstr "Přiřadit vybraná místa k zaškrtnutým pozicím"
 #: static/pretix_pos/pos.js
 msgid "Charging…"
 msgstr "Zpracování platby…"
+
+#: static/pretix_pos/pos.js
+msgid "Click to switch to this date's seating plan."
+msgstr "Kliknutím přepnete na plán sezení tohoto termínu."
+
+#: static/pretix_pos/pos.js
+msgid "Cancel entire order"
+msgstr "Zrušit celou objednávku"
+
+#: static/pretix_pos/pos.js
+msgid "Cancel this entire order? This cannot be undone."
+msgstr "Zrušit celou tuto objednávku? Tuto akci nelze vzít zpět."
+
+#: static/pretix_pos/pos.js
+msgid "Canceling…"
+msgstr "Rušení…"
 
 #: static/pretix_pos/pos.js
 msgid "Could not cancel %(count)s pending payment, continuing anyway: %(errors)s"
