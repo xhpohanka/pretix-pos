@@ -3,6 +3,7 @@ name = "pretix-pos"
 dynamic = ["version"]
 description = "Box-office point-of-sale tool for pretix: direct sales, reservations, and taking payment for existing orders."
 readme = "README.md"
+license = {file = "LICENSE"}
 requires-python = ">=3.8"
 keywords = ["pretix"]
 authors = [
