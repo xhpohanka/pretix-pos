@@ -5,8 +5,6 @@ itself to a pretix organizer via the Device API (no shared staff login) and
 talks directly to pretix's public REST API. Any browser with the pairing
 token can become a POS terminal.
 
-Internal, closed-source plugin — not for redistribution.
-
 ## Development setup
 
 Same as any pretix plugin:
