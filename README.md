@@ -94,9 +94,10 @@ official terminal apps use:
 
 Because the whole thing is client-side and hits the same public API any
 other integration would, there is very little bespoke server code to
-maintain here - the only Django view is a single `TemplateView` that renders
-the static shell and 404s if the plugin isn't enabled for that organizer
-(`pretix_pos/views.py`).
+maintain here - just two Django views in `pretix_pos/views.py`: a
+`TemplateView` that renders the static shell and 404s if the plugin isn't
+enabled for that organizer, and a `JavaScriptCatalog` view for i18n string
+translation in pos.js.
 
 ## Known v1 limitations
 
@@ -104,16 +105,17 @@ the static shell and 404s if the plugin isn't enabled for that organizer
   one action issues N sequential `PATCH` requests; a failure partway through
   leaves the earlier ones placed. The UI reports exactly how many succeeded
   and which failed rather than pretending it's all-or-nothing.
-- **Multi-date orders**: if an order's positions span more than one
-  subevent, the seat map is not shown for that order at all (v1 only
-  resolves the seat map for a single date at a time).
+- **Multi-date orders**: the seat map follows whichever date is selected
+  in the dropdown at the top of the screen. An order spanning multiple
+  dates shows positions for other dates as disabled/greyed-out context
+  rows in the position list; switch the date to work with them.
 - **Seated items with variations** are not supported for direct seat-picking
   (same underlying limitation as `pretix_seating`: `SeatCategoryMapping`
   only maps a layout category to an `Item`, never a specific
   `ItemVariation`).
-- **Sales channel**: orders are created on the `web` channel (no dedicated
-  POS sales channel yet). If item availability needs to differ between the
-  box office and the online shop, this would be the first thing to add.
+- **Sales channel**: orders are created on the `pretix_pos` sales channel
+  (a dedicated channel type for this plugin, shown as "Point of sale" in the
+  control panel).
 - **Estimated cart total only.** The cart shows a client-side sum of known
   default prices before submission; the authoritative price is always
   computed server-side by `OrderCreateSerializer`.
