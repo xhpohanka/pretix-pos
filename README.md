@@ -82,13 +82,13 @@ official terminal apps use:
   token instead of a staff session.
 - **Seat map with coordinates**: pretix core's own public `/seats/` endpoint
   deliberately omits the `x`/`y` drawing coordinates (they only exist because
-  `pretix_seating` materializes them from a `SeatingPlan` layout). This
-  plugin's sibling, `pretix_seating`, therefore registers an additional
-  `/seatmap/` endpoint (`pretix_seating/api.py`) onto the same shared API
+  `pretix_seatmap` materializes them from a `SeatingPlan` layout). This
+  plugin's sibling, `pretix_seatmap`, therefore registers an additional
+  `/seatmap/` endpoint (`pretix_seatmap/api.py`) onto the same shared API
   router, adding `x`, `y`, and a precomputed `status` on top of core's own
   `SeatSerializer` fields - reachable with the same device token, read-only.
-  This app only draws a seat map at all if `pretix_seating` is installed
-  (checked via `window.PretixSeatingRenderer` - `pretix_seating`'s
+  This app only draws a seat map at all if `pretix_seatmap` is installed
+  (checked via `window.PretixSeatingRenderer` - `pretix_seatmap`'s
   `seatmap.js` is loaded unconditionally and just does nothing if that
   plugin isn't present).
 
@@ -110,7 +110,7 @@ translation in pos.js.
   dates shows positions for other dates as disabled/greyed-out context
   rows in the position list; switch the date to work with them.
 - **Seated items with variations** are not supported for direct seat-picking
-  (same underlying limitation as `pretix_seating`: `SeatCategoryMapping`
+  (same underlying limitation as `pretix_seatmap`: `SeatCategoryMapping`
   only maps a layout category to an `Item`, never a specific
   `ItemVariation`).
 - **Sales channel**: orders are created on the `pretix_pos` sales channel

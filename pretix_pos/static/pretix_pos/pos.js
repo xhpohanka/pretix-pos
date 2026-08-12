@@ -657,9 +657,9 @@
         });
     }
 
-    // pretix_seating's seatmap.js (drawSeats) expects short field names (guid, zone,
+    // pretix_seatmap's seatmap.js (drawSeats) expects short field names (guid, zone,
     // product_id) from its own internal endpoints; the public REST API - including
-    // pretix_seating's own /seatmap/ addition to it - uses the API's normal naming
+    // pretix_seatmap's own /seatmap/ addition to it - uses the API's normal naming
     // (seat_guid, zone_name, product). Adapt at the boundary rather than either
     // renaming the public API's fields (inconsistent with every other endpoint) or
     // reaching into seatmap.js's internals (a separate plugin's static asset).
@@ -833,7 +833,7 @@
         seatpickWrap.hidden = false;
         seatpickTitle.textContent = interpolate(gettext("Seats for: %(name)s"), {name: pickI18n(itemsById[activeSeatItem].name)}, true);
         var seId = currentSubeventId();
-        // Same ring-only, no-fill treatment as pretix_seating's eshop picker for
+        // Same ring-only, no-fill treatment as pretix_seatmap's eshop picker for
         // "in cart, not yet submitted" - a solid fixed color could collide with
         // some category's own color, same reason as everywhere else this pattern
         // is used. Matching by seatGuid alone is not enough once a cart can span
@@ -1472,7 +1472,7 @@
         // *staged* - it still needs "Place selected" clicked to actually take
         // effect - so it keeps the ring-only, no-fill "chosen but not committed"
         // treatment. A seat already assigned to this order is already real, so
-        // it gets pretix_seating's MINE_COLOR (solid, muted fill+ring) instead -
+        // it gets pretix_seatmap's MINE_COLOR (solid, muted fill+ring) instead -
         // otherwise the two looked identical and staff couldn't tell "about to
         // place" from "already placed" without checking the position list.
         function isOwnSeat(s) {
