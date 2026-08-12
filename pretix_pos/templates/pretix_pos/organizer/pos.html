@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static eventurl %}
 {% get_current_language as LANGUAGE_CODE %}
 <!doctype html>
 <html lang="{{ LANGUAGE_CODE }}">
@@ -167,7 +167,7 @@
     </div>
 
     <script src="{% static "pretix_seatmap/seatmap.js" %}"></script>
-    <script src="{% url "plugins:pretix_pos:organizer.pos.jsi18n" organizer=organizer.slug %}"></script>
+    <script src="{% eventurl organizer "plugins:pretix_pos:organizer.pos.jsi18n" %}"></script>
     <script src="{% static "pretix_pos/pos.js" %}"></script>
 </body>
 </html>
