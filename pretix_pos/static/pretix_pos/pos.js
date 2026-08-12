@@ -1263,7 +1263,22 @@
             payBtn.className = "pos-btn-primary";
             payBtn.textContent = "Take payment";
             payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
+
+            // Taking cash before every seatable position actually has a seat
+            // risks collecting money for a seat that turns out not to exist -
+            // orderIsSeated() is already used to sort/color the Find order
+            // list, reused here to gate the button itself rather than just
+            // hinting at it.
+            var seated = orderIsSeated(order);
+            payMethodSelect.disabled = !seated;
+            payBtn.disabled = !seated;
             orderDetailEl.appendChild(payBtn);
+            if (!seated) {
+                var seatHint = document.createElement("p");
+                seatHint.className = "pos-hint";
+                seatHint.textContent = "Assign a seat to every position (for every date) before taking payment.";
+                orderDetailEl.appendChild(seatHint);
+            }
         }
 
         // The seatmap always follows whichever date is selected in the bar at
@@ -1326,6 +1341,11 @@
     }
 
     function payOrder(order, method) {
+        // Guards the case where this got called despite the button being
+        // disabled (stale UI state, a race, or a future call site) - the
+        // primary gate is the disabled button in renderOrderDetail().
+        if (!orderIsSeated(order)) return;
+
         var msg = document.createElement("div");
         msg.className = "pos-msg";
         orderDetailEl.appendChild(msg);
@@ -1335,9 +1355,38 @@
         // been paid), so this is the one place that actually knows how much
         // is being added to the till for this payment.
         var amount = pendingSum(order);
-        api(eventPath("/orders/" + order.code + "/payments/"), {
-            method: "POST",
-            body: JSON.stringify({provider: "boxoffice", amount: amount, state: "created", info: {payment_type: method}}),
+
+        // A reservation placed online with a manual payment method (bank
+        // transfer, ...) still carries that payment in "created"/"pending"
+        // state when staff take cash for it at the counter instead - without
+        // canceling it first, the order ends up with two payments (the
+        // never-completed transfer plus the new cash one), which reads as
+        // double-counted in the backend even though only the cash was ever
+        // actually received. pendingSum() already only counts *confirmed*
+        // payments as paid, so this doesn't change the amount being charged
+        // here - only which payment(s) end up on the order afterwards.
+        var stalePayments = (order.payments || []).filter(function (p) {
+            return p.state === "created" || p.state === "pending";
+        });
+
+        function cancelStalePayments() {
+            if (!stalePayments.length) return Promise.resolve([]);
+            return Promise.all(stalePayments.map(function (p) {
+                return api(eventPath("/orders/" + order.code + "/payments/" + p.local_id + "/cancel/"), {method: "POST"})
+                    .then(function (res) { return {payment: p, res: res}; });
+            }));
+        }
+
+        cancelStalePayments().then(function (results) {
+            var failed = results.filter(function (r) { return !r.res.ok; });
+            if (failed.length) {
+                setMsg(msg, "Could not cancel " + failed.length + " pending payment(s), continuing anyway: " +
+                    failed.map(function (r) { return describeError(r.res.data); }).join("; "), "error");
+            }
+            return api(eventPath("/orders/" + order.code + "/payments/"), {
+                method: "POST",
+                body: JSON.stringify({provider: "boxoffice", amount: amount, state: "created", info: {payment_type: method}}),
+            });
         }).then(function (res) {
             if (!res.ok) {
                 setMsg(msg, describeError(res.data), "error");
