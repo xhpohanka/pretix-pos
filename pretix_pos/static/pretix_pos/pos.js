@@ -688,16 +688,30 @@
                 .filter(function (it) { return it.active; })
                 .sort(function (a, b) { return (a.position || 0) - (b.position || 0); });
             sellItems = itemList.map(function (it) {
+                var needsSeat = sellSeats.some(function (s) { return s.product_id === it.id; });
+                var variations = (it.variations || []).filter(function (v) { return v.active; });
+                // A seated item's real availability is the seatmap's own free
+                // seats, already reflected by needsSeat/the map itself - only
+                // filter the plain qty-based case here, same as
+                // loadQuickReservationTab()'s isAvailableAt() check, so
+                // "Vstupenka plus" etc. stops showing up as choosable on a
+                // date that has no quota for it at all.
+                if (!needsSeat) {
+                    variations = variations.filter(function (v) { return isAvailableAt(seId, it.id, v.id); });
+                }
                 return {
                     id: it.id,
                     name: pickI18n(it.name),
                     price: priceFor(it.id, null, seId),
                     hasVariations: it.has_variations,
-                    variations: (it.variations || []).filter(function (v) { return v.active; }).map(function (v) {
+                    variations: variations.map(function (v) {
                         return {id: v.id, value: pickI18n(v.value), price: priceFor(it.id, v.id, seId)};
                     }),
-                    needsSeat: sellSeats.some(function (s) { return s.product_id === it.id; }),
+                    needsSeat: needsSeat,
                 };
+            }).filter(function (item) {
+                if (item.needsSeat) return true;
+                return item.hasVariations ? item.variations.length > 0 : isAvailableAt(seId, item.id, null);
             });
             // Auto-open seat picking for the first seated item instead of
             // requiring an extra "Pick seats" click first - there's nothing to
@@ -1150,9 +1164,8 @@
             units.forEach(function (u) {
                 var td = document.createElement("td");
                 var disabledMap = subeventDisabled[seId] || {items: {}, variations: {}};
-                var disabled = u.variationId
-                    ? disabledMap.variations[u.variationId]
-                    : disabledMap.items[u.itemId];
+                var disabled = (u.variationId ? disabledMap.variations[u.variationId] : disabledMap.items[u.itemId]) ||
+                    !isAvailableAt(seId, u.itemId, u.variationId);
                 if (disabled) {
                     td.className = "pos-quick-cell-disabled";
                     td.textContent = "—";
