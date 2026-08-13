@@ -24,6 +24,7 @@
     var subeventDisabled = {}; // subeventId -> {items: {itemId: true}, variations: {variationId: true}}
     var subeventsList = []; // raw API results, ordered - used by the Quick reservation tab
     var subeventSeatedItems = {}; // subeventId -> {itemId: true} - items with a seat category mapping on that date
+    var quotasBySubevent = {}; // subeventId (or "null" for an event without subevents) -> [{items, variations, available}]
 
     function loadState() {
         try {
@@ -517,7 +518,7 @@
         activeSeatItem = null;
         renderCart();
 
-        loadItemsIndex().then(function () {
+        Promise.all([loadItemsIndex(), loadQuotas()]).then(function () {
             if (state.event.hasSubevents) {
                 subeventBar.hidden = false;
                 loadSubevents().then(loadQuickReservationTab);
@@ -538,6 +539,35 @@
                 });
             }
         });
+    }
+
+    // A date's item_price_overrides only ever say "hidden here"/"different
+    // price here" - they say nothing about whether a quota actually exists
+    // for that item/date at all, so on their own they let an item with no
+    // matching quota show up as choosable (e.g. a variation only ever quota'd
+    // for a *different* date). This is what isAvailableAt() below is for.
+    function loadQuotas() {
+        return apiAllPages(eventPath("/quotas/?with_availability=true")).then(function (res) {
+            quotasBySubevent = {};
+            ((res.ok && res.data && res.data.results) || []).forEach(function (q) {
+                var key = q.subevent != null ? String(q.subevent) : "null";
+                (quotasBySubevent[key] = quotasBySubevent[key] || []).push(q);
+            });
+        });
+    }
+
+    // An item/variation with zero quotas covering it for this date can never
+    // actually be sold there. One with several is only as available as its
+    // *most* exhausted quota - pretix requires room in every quota an
+    // item/variation is linked to, not just one of them (selling one unit
+    // consumes stock from all of them at once).
+    function isAvailableAt(subeventId, itemId, variationId) {
+        var key = subeventId != null ? String(subeventId) : "null";
+        var quotas = (quotasBySubevent[key] || []).filter(function (q) {
+            return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
+        });
+        if (!quotas.length) return false;
+        return quotas.every(function (q) { return q.available; });
     }
 
     function loadSubevents() {
@@ -1487,32 +1517,53 @@
         wrap.className = "pos-add-position";
         var disabledMap = subeventDisabled[subeventId] || {items: {}, variations: {}};
         var available = quickOrderableUnits().filter(function (u) {
-            return u.variationId ? !disabledMap.variations[u.variationId] : !disabledMap.items[u.itemId];
+            var disabled = u.variationId ? disabledMap.variations[u.variationId] : disabledMap.items[u.itemId];
+            return !disabled && isAvailableAt(subeventId, u.itemId, u.variationId);
         });
         if (!available.length) return wrap;
 
-        var select = document.createElement("select");
-        available.forEach(function (u) {
-            var opt = document.createElement("option");
-            opt.value = u.itemId + (u.variationId ? ":" + u.variationId : "");
-            opt.textContent = u.label;
-            select.appendChild(opt);
-        });
-        wrap.appendChild(select);
-
         var addBtn = document.createElement("button");
         addBtn.type = "button";
-        addBtn.className = "pos-btn-icon pos-btn-icon-add";
-        addBtn.textContent = "+";
-        addBtn.title = gettext("Add a ticket for this date");
+        addBtn.className = "pos-btn-add-position";
+        addBtn.textContent = "+ " + gettext("Add a ticket");
         var addMsg = document.createElement("div");
         addMsg.className = "pos-msg";
+
+        var popup = null;
+        function closePopup() {
+            if (!popup) return;
+            popup.remove();
+            popup = null;
+            document.removeEventListener("click", onOutsideClick, true);
+        }
+        function onOutsideClick(ev) {
+            if (popup && !popup.contains(ev.target) && ev.target !== addBtn) closePopup();
+        }
+        function doAdd(u) {
+            addPositionToOrder(subeventId, u.itemId, u.variationId, addBtn, addMsg);
+        }
+
+        // Only one real choice for this date - add it straight away, nothing
+        // to disambiguate. With several, a popup (not a persistent <select>
+        // sitting in the header at all times) keeps the item choice out of
+        // the way until it's actually needed.
         addBtn.addEventListener("click", function () {
-            var parts = select.value.split(":");
-            addPositionToOrder(
-                subeventId, parseInt(parts[0], 10), parts[1] ? parseInt(parts[1], 10) : null,
-                addBtn, addMsg
-            );
+            if (popup) { closePopup(); return; }
+            if (available.length === 1) { doAdd(available[0]); return; }
+            popup = document.createElement("div");
+            popup.className = "pos-add-popup";
+            available.forEach(function (u) {
+                var opt = document.createElement("button");
+                opt.type = "button";
+                opt.textContent = u.label;
+                opt.addEventListener("click", function () {
+                    closePopup();
+                    doAdd(u);
+                });
+                popup.appendChild(opt);
+            });
+            wrap.appendChild(popup);
+            document.addEventListener("click", onOutsideClick, true);
         });
         wrap.appendChild(addBtn);
         wrap.appendChild(addMsg);

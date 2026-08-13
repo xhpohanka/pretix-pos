@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pretix-pos\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-13 14:32+0200\n"
+"POT-Creation-Date: 2026-08-13 15:17+0200\n"
 "PO-Revision-Date: 2026-08-12 12:00+0000\n"
 "Last-Translator: Jan Pohanka\n"
 "Language-Team: Czech\n"
@@ -195,8 +195,8 @@ msgid "Item #%(id)s"
 msgstr "Položka č. %(id)s"
 
 #: static/pretix_pos/pos.js
-msgid "Add a ticket for this date"
-msgstr "Přidat vstupenku na tento termín"
+msgid "Add a ticket"
+msgstr "Přidat vstupenku"
 
 #: static/pretix_pos/pos.js
 msgid "no seat"
@@ -422,3 +422,6 @@ msgstr "Blok přesunut."
 #: static/pretix_pos/pos.js
 msgid "Some seats failed to move: %(error)s"
 msgstr "Některá místa se nepodařilo přesunout: %(error)s"
+
+#~ msgid "Add a ticket for this date"
+#~ msgstr "Přidat vstupenku na tento termín"
