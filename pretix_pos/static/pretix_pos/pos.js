@@ -1345,6 +1345,30 @@
     var payMethodSelect = null;
     var seatHintEl = null;
 
+    // Persistent containers inside orderDetailEl, created once per full
+    // renderOrderDetail() (initial order load / date switch) and reused by
+    // refreshOrderSummary() afterwards - refreshOrderSummary() only ever
+    // clears/refills *their* contents, never orderDetailEl itself, so the
+    // position list's own DOM node stays the exact one initOrderSeatMap()
+    // already attached its "change" listener to (see positionListEl there).
+    // Replacing it on every add/cancel/refund would silently stop checkbox
+    // clicks from reaching the seatmap's "Place selected" button until the
+    // next full reload.
+    var orderHeaderEl = null;
+    var orderTotalEl = null;
+    var orderCreditEl = null;
+    var orderListEl = null;
+    var orderPayBlockEl = null;
+    var orderCancelBlockEl = null;
+
+    // Set by initOrderSeatMap() to its own internal redraw function - lets
+    // refreshOrderSummary() put the seatmap's colors back in sync with a
+    // freshly-refetched currentOrder (a freed/consumed seat) without
+    // re-fetching the whole seatmap from the API and rebuilding the SVG from
+    // scratch, which is the slow, flashy part of a full reload and was
+    // getting triggered on every single add/cancel click.
+    var orderSeatmapRedraw = null;
+
     // Placing/moving/removing a seat changes whether the order is fully seated, but
     // deliberately doesn't reload the whole order detail panel (see the comment on
     // applyPositionSeat()) - so the "Take payment" button's disabled state, set once
@@ -1525,7 +1549,8 @@
         var addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "pos-btn-add-position";
-        addBtn.textContent = "+ " + gettext("Add a ticket");
+        addBtn.textContent = "+";
+        addBtn.title = gettext("Add a ticket");
         var addMsg = document.createElement("div");
         addMsg.className = "pos-msg";
 
@@ -1698,30 +1723,24 @@
         }
     }
 
-    function renderOrderDetail() {
-        orderDetailEl.hidden = false;
-        orderDetailEl.innerHTML = "";
-        orderSeatmapWrapEl.innerHTML = "";
+    // Refills the persistent summary containers (see their declarations
+    // above) from currentOrder - called both by renderOrderDetail() itself
+    // (first paint for a newly loaded order / date switch) and by
+    // refreshOrderAfterEdit() (after add/cancel/refund), without ever
+    // touching orderDetailEl's own innerHTML or the seatmap. That's what
+    // lets those actions restage the summary without redoing the expensive
+    // part (refetch+redraw the whole seatmap) on every single click.
+    function refreshOrderSummary() {
         var order = currentOrder;
-        // innerHTML = "" above already detached whatever these pointed to from a
-        // previous render - drop the references too so refreshPayButtonState()
-        // doesn't touch detached nodes for an order that's no longer "n"/pending.
-        payBtn = null;
-        payMethodSelect = null;
-        seatHintEl = null;
 
-        var h = document.createElement("h3");
-        h.textContent = order.code + " — " + orderCustomerLabel(order) + " — " + order.status;
-        orderDetailEl.appendChild(h);
+        orderHeaderEl.textContent = order.code + " — " + orderCustomerLabel(order) + " — " + order.status;
 
         var pending = parseFloat(pendingSum(order));
-        var p = document.createElement("p");
-        p.textContent = interpolate(gettext("Total: %(total)s"), {total: order.total}, true) + (
+        orderTotalEl.textContent = interpolate(gettext("Total: %(total)s"), {total: order.total}, true) + (
             pending > 0 ? interpolate(gettext(" — pending: %(amount)s"), {amount: pending.toFixed(2)}, true) :
             pending < 0 ? interpolate(gettext(" — credit owed to customer: %(amount)s"), {amount: (-pending).toFixed(2)}, true) :
             gettext(" — fully paid")
         );
-        orderDetailEl.appendChild(p);
 
         // A canceled position (or a lower price after an edit) on an
         // already-paid order doesn't trigger any refund on its own - core
@@ -1730,6 +1749,7 @@
         // is left sitting on the order until someone here explicitly decides
         // what to do with it - recordRefund() only ever runs on that explicit
         // click, never automatically.
+        orderCreditEl.innerHTML = "";
         if (pending < 0) {
             var creditWrap = document.createElement("div");
             creditWrap.className = "pos-credit-banner";
@@ -1746,13 +1766,18 @@
             });
             creditWrap.appendChild(creditBtn);
             creditWrap.appendChild(creditMsg);
-            orderDetailEl.appendChild(creditWrap);
+            orderCreditEl.appendChild(creditWrap);
         }
 
-        var list = document.createElement("div");
-        renderPositionList(list);
-        orderDetailEl.appendChild(list);
+        renderPositionList(orderListEl);
 
+        orderPayBlockEl.innerHTML = "";
+        // innerHTML = "" above already detached whatever these pointed to from a
+        // previous render - drop the references too so refreshPayButtonState()
+        // doesn't touch detached nodes for an order that's no longer "n"/pending.
+        payBtn = null;
+        payMethodSelect = null;
+        seatHintEl = null;
         if (order.status === "n") {
             payMethodSelect = document.createElement("select");
             PAYMENT_METHODS.forEach(function (m) {
@@ -1761,19 +1786,19 @@
                 opt.textContent = m.label;
                 payMethodSelect.appendChild(opt);
             });
-            orderDetailEl.appendChild(payMethodSelect);
+            orderPayBlockEl.appendChild(payMethodSelect);
 
             payBtn = document.createElement("button");
             payBtn.type = "button";
             payBtn.className = "pos-btn-primary";
             payBtn.textContent = gettext("Take payment");
             payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
-            orderDetailEl.appendChild(payBtn);
+            orderPayBlockEl.appendChild(payBtn);
 
             seatHintEl = document.createElement("p");
             seatHintEl.className = "pos-hint";
             seatHintEl.textContent = gettext("Assign a seat to every position (for every date) before taking payment.");
-            orderDetailEl.appendChild(seatHintEl);
+            orderPayBlockEl.appendChild(seatHintEl);
 
             // Taking cash before every seatable position actually has a seat risks
             // collecting money for a seat that turns out not to exist -
@@ -1784,6 +1809,7 @@
             refreshPayButtonState();
         }
 
+        orderCancelBlockEl.innerHTML = "";
         if (order.status !== "c") {
             var cancelMsg = document.createElement("div");
             cancelMsg.className = "pos-msg";
@@ -1794,9 +1820,46 @@
             cancelBtn.style.marginTop = "10px";
             cancelBtn.textContent = gettext("Cancel entire order");
             cancelBtn.addEventListener("click", function () { cancelOrder(order, cancelBtn, cancelMsg); });
-            orderDetailEl.appendChild(cancelBtn);
-            orderDetailEl.appendChild(cancelMsg);
+            orderCancelBlockEl.appendChild(cancelBtn);
+            orderCancelBlockEl.appendChild(cancelMsg);
         }
+    }
+
+    // Re-fetches currentOrder and restages the summary in place - used after
+    // add/cancel/refund instead of loadOrderDetail(), which would also
+    // refetch and completely rebuild the seatmap (see refreshOrderSummary()'s
+    // own comment) even though none of these three actions need that: a
+    // canceled/newly-added position's own seat status is patched back into
+    // the existing map via orderSeatmapRedraw() instead.
+    function refreshOrderAfterEdit() {
+        return api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/")).then(function (res) {
+            if (!res.ok) return;
+            currentOrder = res.data;
+            refreshOrderSummary();
+            if (orderSeatmapRedraw) orderSeatmapRedraw();
+        });
+    }
+
+    function renderOrderDetail() {
+        orderDetailEl.hidden = false;
+        orderDetailEl.innerHTML = "";
+        orderSeatmapWrapEl.innerHTML = "";
+        orderSeatmapRedraw = null;
+
+        orderHeaderEl = document.createElement("h3");
+        orderDetailEl.appendChild(orderHeaderEl);
+        orderTotalEl = document.createElement("p");
+        orderDetailEl.appendChild(orderTotalEl);
+        orderCreditEl = document.createElement("div");
+        orderDetailEl.appendChild(orderCreditEl);
+        orderListEl = document.createElement("div");
+        orderDetailEl.appendChild(orderListEl);
+        orderPayBlockEl = document.createElement("div");
+        orderDetailEl.appendChild(orderPayBlockEl);
+        orderCancelBlockEl = document.createElement("div");
+        orderDetailEl.appendChild(orderCancelBlockEl);
+
+        refreshOrderSummary();
 
         // The seatmap always follows whichever date is selected in the bar at
         // the top of the screen (shared with Sell/Reserve) - NOT "whichever
@@ -1853,7 +1916,7 @@
             orderSeatmapWrapEl.appendChild(placeBtn);
             orderSeatmapWrapEl.appendChild(placeMsg);
 
-            initOrderSeatMap(svg, placeBtn, placeMsg, list, seId);
+            orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, placeMsg, orderListEl, seId);
         });
     }
 
@@ -1967,7 +2030,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            loadOrderDetail(order.code);
+            refreshOrderAfterEdit();
             doSearch();
         });
     }
@@ -2025,10 +2088,10 @@
                 setMsg(msg, result.error, "error");
                 return;
             }
-            // loadOrderDetail() rebuilds this whole panel (including this
-            // button/message), so there's nothing further to reset here even
-            // when releaseFailed - the rebuilt seat badge already shows it.
-            loadOrderDetail(order.code);
+            // refreshOrderAfterEdit() restages the position list (including
+            // this button/message), so there's nothing further to reset here
+            // even when releaseFailed - the restaged seat badge already shows it.
+            refreshOrderAfterEdit();
             doSearch();
         });
     }
@@ -2053,7 +2116,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            loadOrderDetail(order.code);
+            refreshOrderAfterEdit();
             doSearch();
         });
     }
@@ -2515,6 +2578,15 @@
 
         render();
         renderPlaceBtn();
+
+        // Handed back to renderOrderDetail() as orderSeatmapRedraw - lets a
+        // later refreshOrderAfterEdit() put this same map's colors and
+        // "Place N seats on M positions" button text back in sync with a
+        // freshly-refetched currentOrder without tearing any of this down.
+        return function () {
+            render();
+            renderPlaceBtn();
+        };
     }
 
     // -------------------------------------------------------------------- boot
