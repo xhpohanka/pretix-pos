@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pretix-pos\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-13 15:17+0200\n"
+"POT-Creation-Date: 2026-08-13 15:57+0200\n"
 "PO-Revision-Date: 2026-08-12 12:00+0000\n"
 "Last-Translator: Jan Pohanka\n"
 "Language-Team: Czech\n"
@@ -189,6 +189,10 @@ msgstr "celkem %(total)s"
 #: static/pretix_pos/pos.js
 msgid "pending %(amount)s"
 msgstr "čeká na úhradu %(amount)s"
+
+#: static/pretix_pos/pos.js
+msgid "credit %(amount)s"
+msgstr "dluh %(amount)s"
 
 #: static/pretix_pos/pos.js
 msgid "Item #%(id)s"

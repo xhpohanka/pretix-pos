@@ -1429,6 +1429,14 @@
     }
 
     function orderSortKey(o) {
+        // A canceled order's positions are canceled right along with it, so
+        // orderIsSeated()'s "every position has a seat" is vacuously true
+        // over an empty list - without this check that made a canceled order
+        // sort as if it were just another seated/pending order instead of
+        // dropping to the very end, where nothing about it needs attention
+        // anymore (a refund, if one's owed, is called out via pendingSum()
+        // in renderSearchResults() instead).
+        if (o.status === "c") return 4;
         var needsSeat = !orderIsSeated(o);
         var unpaid = o.status !== "p";
         return (needsSeat ? 0 : 2) + (unpaid ? 0 : 1);
@@ -1468,20 +1476,31 @@
         }
         orders.forEach(function (o) {
             var div = document.createElement("div");
+            // Canceled (grey, sorted last by orderSortKey()) takes priority
+            // over the seated/paid coloring below - a canceled order's own
+            // positions are canceled too, so "is it seated" no longer means
+            // anything for it either way.
+            var canceled = o.status === "c";
             // Seated+paid (green) / seated+unpaid (yellow) / not yet seated
             // (plain/white) - staff's main question at a glance is "does this
             // still need seats", with payment status as a secondary cue only
             // once seating is already done.
-            var seated = orderIsSeated(o);
+            var seated = !canceled && orderIsSeated(o);
             div.className = "pos-search-result" +
-                (seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
+                (canceled ? " pos-order-canceled" : seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
-            var pending = pendingSum(o);
+            var pending = parseFloat(pendingSum(o));
             var line = " — " + orderCustomerLabel(o) + " — " + o.status + " — " +
                 interpolate(gettext("total %(total)s"), {total: o.total}, true);
-            if (parseFloat(pending) > 0) {
-                line += ", " + interpolate(gettext("pending %(amount)s"), {amount: pending}, true);
+            if (pending > 0) {
+                line += ", " + interpolate(gettext("pending %(amount)s"), {amount: pending.toFixed(2)}, true);
+            } else if (pending < 0) {
+                // Most often a canceled order that was already paid - core
+                // never auto-refunds a manual/cash payment, so this is the
+                // one place staff would otherwise have no way to notice a
+                // refund is still owed without opening the order.
+                line += ", " + interpolate(gettext("credit %(amount)s"), {amount: (-pending).toFixed(2)}, true);
             }
             div.appendChild(document.createTextNode(line));
             div.addEventListener("click", function () { loadOrderDetail(o.code); });
@@ -1511,13 +1530,21 @@
     // owed to the customer) instead of clamping at zero, and also what pulls
     // it back towards zero again once recordRefund() records the payout.
     function pendingSum(order) {
+        // A canceled order's own total (the model field, as returned by the
+        // API) still shows whatever it was before cancellation - core's
+        // Order.pending_sum property special-cases this to 0 for exactly
+        // this calculation, since a canceled order owes nothing *itself*
+        // anymore; skipping this made a canceled-but-paid order look like
+        // pendingSum() was 0 (total == paid) instead of strongly negative
+        // (the whole payment now owed back).
+        var total = order.status === "c" ? 0 : parseFloat(order.total);
         var paid = (order.payments || [])
             .filter(function (p) { return p.state === "confirmed" || p.state === "refunded"; })
             .reduce(function (sum, p) { return sum + parseFloat(p.amount); }, 0);
         var refunded = (order.refunds || [])
             .filter(function (r) { return r.state === "done" || r.state === "transit" || r.state === "created"; })
             .reduce(function (sum, r) { return sum + parseFloat(r.amount); }, 0);
-        return (parseFloat(order.total) - paid + refunded).toFixed(2);
+        return (total - paid + refunded).toFixed(2);
     }
 
     function positionLabel(p) {
