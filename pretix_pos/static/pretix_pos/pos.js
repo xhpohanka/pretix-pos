@@ -1163,16 +1163,17 @@
         return positions;
     }
 
-    // The public order-create API unconditionally rejects a position for a
-    // seated product unless it already carries a seat (see OrderCreateSerializer
-    // in pretix core - it has no "seat later" affordance at all, unlike the
-    // eshop's own manual-assignment checkout, which never goes through this
-    // endpoint). So to create the reservation at all, every seated position
-    // here first grabs whichever free seat comes first for its item/date, then
-    // gets that seat unassigned again right after creation (same PATCH
-    // {seat: null} as unassignSeat() below) - landing the order in the exact
-    // same "needs seating" queue as any other manually-assigned reservation,
-    // per the Edit order tab, instead of holding a seat staff never chose.
+    // Only still needed for a date where customers pick their own seat
+    // (seating_choice on) - core's order-create API only requires a seat
+    // there, matching cart validation and order placement (see
+    // submitQuickReservation() below for the normal, sans-hack path). To
+    // create the reservation on one of those dates at all, every such
+    // position here first grabs whichever free seat comes first for its
+    // item/date, then gets that seat unassigned again right after creation
+    // (same PATCH {seat: null} as unassignSeat() below) - landing the order
+    // in the exact same "needs seating" queue as any other manually-assigned
+    // reservation, per the Edit order tab, instead of holding a seat staff
+    // never chose.
     function assignQuickSeats(positions) {
         if (!window.PretixSeatingRenderer) return Promise.resolve(true);
         var bySubevent = {};
@@ -1211,6 +1212,54 @@
         })).then(function (results) { return results.every(Boolean); });
     }
 
+    // Sequential, not Promise.all - concurrent PATCHes against positions of the
+    // *same* order race on OrderChangeManager's optimistic lock (see commit()
+    // in orders.py, which compares Order.last_modified under select_for_update)
+    // and the loser fails with a race-condition error, silently leaving that
+    // seat assigned if nothing checks res.ok before moving on.
+    function releaseQuickSeats(orderPositions) {
+        var seated = orderPositions.filter(function (p) { return p.seat; });
+        var releaseNext = function (i) {
+            if (i >= seated.length) return Promise.resolve(true);
+            return api(eventPath("/orderpositions/" + seated[i].id + "/"), {
+                method: "PATCH", body: JSON.stringify({seat: null}),
+            }).then(function (res) {
+                if (!res.ok) return false;
+                return releaseNext(i + 1);
+            });
+        };
+        return releaseNext(0);
+    }
+
+    // core's order-create API rejects a seatless position for a seated product
+    // outright *only* on a date where customers pick their own seat
+    // (seating_choice on) - see OrderCreateSerializer, which mirrors cart
+    // validation and order placement's own relaxation for manual/staff
+    // assignment dates. So try the plain, hack-free request first; a
+    // seating_choice-on date is the one case that still needs the
+    // grab-a-seat-then-release-it dance (assignQuickSeats()/
+    // releaseQuickSeats()) to get past that check at all.
+    function createQuickOrder(body, positions) {
+        return api(eventPath("/orders/"), {method: "POST", body: JSON.stringify(body)}).then(function (res) {
+            if (res.ok) return {order: res.data};
+            var seatRequired = (res.data && res.data.positions || []).some(function (p) { return p && p.seat; });
+            if (!seatRequired) return {error: describeError(res.data)};
+            return assignQuickSeats(positions).then(function (enough) {
+                if (!enough) {
+                    return {error: gettext("Not enough free seats left for one of these dates/items - try a smaller quantity.")};
+                }
+                return api(eventPath("/orders/"), {
+                    method: "POST", body: JSON.stringify(Object.assign({}, body, {positions: positions})),
+                }).then(function (res2) {
+                    if (!res2.ok) return {error: describeError(res2.data)};
+                    return releaseQuickSeats(res2.data.positions).then(function (allReleased) {
+                        return {order: res2.data, releaseFailed: !allReleased};
+                    });
+                });
+            });
+        });
+    }
+
     function submitQuickReservation() {
         var positions = buildQuickPositions();
         if (!positions.length) {
@@ -1229,52 +1278,22 @@
         if (name) positions.forEach(function (p) { p.attendee_name = name; });
         quickBtnReserve.disabled = true;
         setMsg(quickMsg, gettext("Submitting…"), null);
-        assignQuickSeats(positions).then(function (enough) {
-            if (!enough) {
-                quickBtnReserve.disabled = false;
-                setMsg(quickMsg, gettext("Not enough free seats left for one of these dates/items - try a smaller quantity."), "error");
+        var body = {status: "n", positions: positions};
+        if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
+        if (email) body.email = email;
+        createQuickOrder(body, positions).then(function (result) {
+            quickBtnReserve.disabled = false;
+            if (result.error) {
+                setMsg(quickMsg, result.error, "error");
                 return;
             }
-            var body = {status: "n", positions: positions};
-            if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
-            if (email) body.email = email;
-            api(eventPath("/orders/"), {method: "POST", body: JSON.stringify(body)}).then(function (res) {
-                if (!res.ok) {
-                    quickBtnReserve.disabled = false;
-                    setMsg(quickMsg, describeError(res.data), "error");
-                    return;
-                }
-                var seated = res.data.positions.filter(function (p) { return p.seat; });
-                // Sequential, not Promise.all - concurrent PATCHes against
-                // positions of the *same* order race on OrderChangeManager's
-                // optimistic lock (see commit() in orders.py, which compares
-                // Order.last_modified under select_for_update) and the loser
-                // fails with a race-condition error, silently leaving that
-                // seat assigned since nothing here checked res.ok before.
-                var releaseNext = function (i) {
-                    if (i >= seated.length) return Promise.resolve(true);
-                    return api(eventPath("/orderpositions/" + seated[i].id + "/"), {
-                        method: "PATCH", body: JSON.stringify({seat: null}),
-                    }).then(function (res2) {
-                        if (!res2.ok) return false;
-                        return releaseNext(i + 1);
-                    });
-                };
-                releaseNext(0).then(function (allReleased) {
-                    quickBtnReserve.disabled = false;
-                    if (!allReleased) {
-                        setMsg(quickMsg, interpolate(gettext("Reserved — order %(code)s, total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."), {code: res.data.code, total: res.data.total}, true), "error");
-                        quickEmailInput.value = "";
-                        quickNameInput.value = "";
-                        loadQuickReservationTab();
-                        return;
-                    }
-                    setMsg(quickMsg, interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true), "success");
-                    quickEmailInput.value = "";
-                    quickNameInput.value = "";
-                    loadQuickReservationTab();
-                });
-            });
+            var msg = result.releaseFailed
+                ? interpolate(gettext("Reserved — order %(code)s, total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."), {code: result.order.code, total: result.order.total}, true)
+                : interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: result.order.code, total: result.order.total}, true);
+            setMsg(quickMsg, msg, result.releaseFailed ? "error" : "success");
+            quickEmailInput.value = "";
+            quickNameInput.value = "";
+            loadQuickReservationTab();
         });
     }
 
