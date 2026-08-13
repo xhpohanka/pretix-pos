@@ -33,6 +33,29 @@ button.pos-btn-danger {
     color: #c62828;
 }
 
+button.pos-btn-secondary {
+    background: #fff;
+    border-color: #337ab7;
+    color: #337ab7;
+}
+
+button.pos-btn-icon {
+    padding: 2px 8px;
+    line-height: 1;
+    font-size: 15px;
+    border-radius: 50%;
+}
+
+button.pos-btn-icon-add {
+    border-color: #2e7d32;
+    color: #2e7d32;
+}
+
+button.pos-btn-icon-danger {
+    border-color: #c62828;
+    color: #c62828;
+}
+
 input[type=text], input[type=email], select {
     font: inherit;
     padding: 7px 9px;
@@ -276,6 +299,35 @@ button.pos-tab.active {
 }
 
 .pos-seat-badge.pos-seat-missing { background: #ffe0b2; }
+
+.pos-position-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0 4px;
+    margin-top: 6px;
+    border-top: 2px solid #ddd;
+    font-weight: 600;
+}
+
+.pos-position-group-header:first-child { margin-top: 0; border-top: none; }
+
+.pos-add-position {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: normal;
+}
+
+.pos-add-position select { width: auto; max-width: 220px; }
+
+.pos-credit-banner {
+    margin: 8px 0;
+    padding: 10px;
+    background: #fff3e0;
+    border: 1px solid #f0dfa8;
+    border-radius: 6px;
+}
 
 .pos-quick-table {
     border-collapse: collapse;

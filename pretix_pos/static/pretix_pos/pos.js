@@ -1449,13 +1449,21 @@
     }
 
     // The public API's OrderSerializer has no pending_sum field (unlike the
-    // internal Order model, which computes it server-side) - derive it from
-    // the confirmed payments actually present in the order's own response.
+    // internal Order model, which computes it server-side) - derive it the
+    // same way Order.pending_sum does: total, minus what's actually been
+    // paid (confirmed or since-refunded payments), plus whatever's already
+    // been refunded back out. That last term is what makes this go negative
+    // after a position is canceled on an already-paid order (a real credit
+    // owed to the customer) instead of clamping at zero, and also what pulls
+    // it back towards zero again once recordRefund() records the payout.
     function pendingSum(order) {
         var paid = (order.payments || [])
-            .filter(function (p) { return p.state === "confirmed"; })
+            .filter(function (p) { return p.state === "confirmed" || p.state === "refunded"; })
             .reduce(function (sum, p) { return sum + parseFloat(p.amount); }, 0);
-        return (parseFloat(order.total) - paid).toFixed(2);
+        var refunded = (order.refunds || [])
+            .filter(function (r) { return r.state === "done" || r.state === "transit" || r.state === "created"; })
+            .reduce(function (sum, r) { return sum + parseFloat(r.amount); }, 0);
+        return (parseFloat(order.total) - paid + refunded).toFixed(2);
     }
 
     function positionLabel(p) {
@@ -1468,63 +1476,153 @@
         return name;
     }
 
-    // (Re)builds the position checkbox/label/seat-badge rows into container from
-    // currentOrder.positions - factored out so a seat placement/move can refresh
-    // just this list in place (see applyPositionSeat()) instead of the whole
-    // order detail having to be refetched and rebuilt from scratch.
+    // One <select> + "+" button, appending one new (unseated-for-now)
+    // position for subeventId (null for an event without subevents) via
+    // addPositionToOrder() - reused for every group header below and for the
+    // no-subevents case. Only lists items not disabled for that date (same
+    // source as the Quick reservation table); renders nothing if there's
+    // nothing addable there.
+    function renderPositionAdder(subeventId) {
+        var wrap = document.createElement("span");
+        wrap.className = "pos-add-position";
+        var disabledMap = subeventDisabled[subeventId] || {items: {}, variations: {}};
+        var available = quickOrderableUnits().filter(function (u) {
+            return u.variationId ? !disabledMap.variations[u.variationId] : !disabledMap.items[u.itemId];
+        });
+        if (!available.length) return wrap;
+
+        var select = document.createElement("select");
+        available.forEach(function (u) {
+            var opt = document.createElement("option");
+            opt.value = u.itemId + (u.variationId ? ":" + u.variationId : "");
+            opt.textContent = u.label;
+            select.appendChild(opt);
+        });
+        wrap.appendChild(select);
+
+        var addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "pos-btn-icon pos-btn-icon-add";
+        addBtn.textContent = "+";
+        addBtn.title = gettext("Add a ticket for this date");
+        var addMsg = document.createElement("div");
+        addMsg.className = "pos-msg";
+        addBtn.addEventListener("click", function () {
+            var parts = select.value.split(":");
+            addPositionToOrder(
+                subeventId, parseInt(parts[0], 10), parts[1] ? parseInt(parts[1], 10) : null,
+                addBtn, addMsg
+            );
+        });
+        wrap.appendChild(addBtn);
+        wrap.appendChild(addMsg);
+        return wrap;
+    }
+
+    // One position row: label, seat badge, cancel button. otherDate mirrors
+    // the old flat list's meaning - a position for a date other than the one
+    // currently on screen (no seatmap for it right now) shows as context but
+    // can't be checked/placed from here.
+    function renderPositionRow(pos, otherDate) {
+        var row = document.createElement("div");
+        row.className = "pos-position-row" + (otherDate ? " pos-position-row-other-date" : "");
+
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.dataset.positionId = pos.id;
+        cb.disabled = otherDate;
+        cb.checked = !otherDate && !pos.seat;
+        row.appendChild(cb);
+
+        var label = document.createElement("span");
+        label.textContent = positionLabel(pos);
+        row.appendChild(label);
+
+        var badge = document.createElement("span");
+        if (pos.seat) {
+            badge.className = "pos-seat-badge";
+            badge.textContent = pos.seat.name || pos.seat.seat_guid;
+        } else {
+            badge.className = "pos-seat-badge pos-seat-missing";
+            badge.textContent = gettext("no seat");
+        }
+        row.appendChild(badge);
+
+        var delMsg = document.createElement("div");
+        delMsg.className = "pos-msg";
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "pos-btn-icon pos-btn-icon-danger";
+        delBtn.textContent = "×";
+        delBtn.title = gettext("Cancel this position");
+        delBtn.addEventListener("click", function () { deletePositionFromOrder(pos, delBtn, delMsg); });
+        row.appendChild(delBtn);
+        row.appendChild(delMsg);
+
+        return row;
+    }
+
+    // (Re)builds the position list into container from currentOrder.positions -
+    // factored out so a seat placement/move can refresh just this list in
+    // place (see applyPositionSeat()) instead of the whole order detail
+    // having to be refetched and rebuilt from scratch.
+    //
+    // Grouped by date (one header per active subevent, each with its own "+"
+    // adder) rather than a flat list - a date the order doesn't have any
+    // positions on yet still gets a header, so staff can add the *first*
+    // position for a date through the same control as any other, instead of
+    // needing Quick reservation/Sell just because nothing's there yet. For
+    // an event without subevents there's no grouping, just one adder.
     function renderPositionList(container) {
         container.innerHTML = "";
         var seId = currentSubeventId();
         var positions = (currentOrder.positions || []).filter(function (pos) { return !pos.canceled; });
+
+        if (!state.event.hasSubevents) {
+            positions.forEach(function (pos) {
+                container.appendChild(renderPositionRow(pos, false));
+            });
+            container.appendChild(renderPositionAdder(null));
+            return;
+        }
+
+        var bySubevent = {};
         positions.forEach(function (pos) {
-            // An order can span several dates (see subeventSelect's change
-            // handler) but the seatmap below only ever shows one date at a
-            // time - a position for any *other* date is shown for context
-            // (so staff can see the whole order) but can't be checked/placed
-            // from here, since there's no seatmap on screen for it right now.
-            var otherDate = !subeventsMatch(pos.subevent, seId);
+            var key = String(pos.subevent);
+            (bySubevent[key] = bySubevent[key] || []).push(pos);
+        });
 
-            var row = document.createElement("div");
-            row.className = "pos-position-row" + (otherDate ? " pos-position-row-other-date" : "");
+        subeventsList.forEach(function (se) {
+            var key = String(se.id);
+            var group = bySubevent[key] || [];
+            delete bySubevent[key];
 
-            var cb = document.createElement("input");
-            cb.type = "checkbox";
-            cb.dataset.positionId = pos.id;
-            cb.disabled = otherDate;
-            cb.checked = !otherDate && !pos.seat;
-            row.appendChild(cb);
+            var header = document.createElement("div");
+            header.className = "pos-position-group-header";
 
-            var label = document.createElement("span");
-            label.textContent = positionLabel(pos);
-            row.appendChild(label);
+            var dateLabel = document.createElement("span");
+            dateLabel.className = "pos-seat-badge pos-date-badge";
+            dateLabel.textContent = subeventLabel(se.id);
+            dateLabel.title = gettext("Click to switch to this date's seating plan.");
+            dateLabel.addEventListener("click", function () {
+                subeventSelect.value = se.id;
+                subeventSelect.dispatchEvent(new Event("change"));
+            });
+            header.appendChild(dateLabel);
+            header.appendChild(renderPositionAdder(se.id));
+            container.appendChild(header);
 
-            // Shown for every position, not just other-date ones (an order with a
-            // single date still benefits from seeing which one it is) - clicking it
-            // switches the date bar at the top, which re-renders this whole panel
-            // (see subeventSelect's change handler) so its seatmap comes on screen.
-            if (state.event.hasSubevents) {
-                var dateBadge = document.createElement("span");
-                dateBadge.className = "pos-seat-badge pos-date-badge";
-                dateBadge.textContent = subeventLabel(pos.subevent);
-                dateBadge.title = gettext("Click to switch to this date's seating plan.");
-                dateBadge.addEventListener("click", function () {
-                    subeventSelect.value = pos.subevent;
-                    subeventSelect.dispatchEvent(new Event("change"));
-                });
-                row.appendChild(dateBadge);
-            }
+            group.forEach(function (pos) {
+                container.appendChild(renderPositionRow(pos, !subeventsMatch(pos.subevent, seId)));
+            });
+        });
 
-            var badge = document.createElement("span");
-            if (pos.seat) {
-                badge.className = "pos-seat-badge";
-                badge.textContent = pos.seat.name || pos.seat.seat_guid;
-            } else {
-                badge.className = "pos-seat-badge pos-seat-missing";
-                badge.textContent = gettext("no seat");
-            }
-            row.appendChild(badge);
-
-            container.appendChild(row);
+        // A position whose date isn't in subeventsList (an inactive/deleted
+        // date) still needs to show up somewhere, just without a header/adder.
+        Object.keys(bySubevent).forEach(function (key) {
+            bySubevent[key].forEach(function (pos) {
+                container.appendChild(renderPositionRow(pos, !subeventsMatch(pos.subevent, seId)));
+            });
         });
     }
 
@@ -1565,13 +1663,40 @@
         h.textContent = order.code + " — " + orderCustomerLabel(order) + " — " + order.status;
         orderDetailEl.appendChild(h);
 
-        var pending = pendingSum(order);
+        var pending = parseFloat(pendingSum(order));
         var p = document.createElement("p");
-        p.textContent = interpolate(gettext("Total: %(total)s"), {total: order.total}, true) +
-            (parseFloat(pending) > 0
-                ? interpolate(gettext(" — pending: %(amount)s"), {amount: pending}, true)
-                : gettext(" — fully paid"));
+        p.textContent = interpolate(gettext("Total: %(total)s"), {total: order.total}, true) + (
+            pending > 0 ? interpolate(gettext(" — pending: %(amount)s"), {amount: pending.toFixed(2)}, true) :
+            pending < 0 ? interpolate(gettext(" — credit owed to customer: %(amount)s"), {amount: (-pending).toFixed(2)}, true) :
+            gettext(" — fully paid")
+        );
         orderDetailEl.appendChild(p);
+
+        // A canceled position (or a lower price after an edit) on an
+        // already-paid order doesn't trigger any refund on its own - core
+        // only auto-reacts to a *higher* total on a paid order (flips it back
+        // to pending, handled by the "Take payment" block below). A credit
+        // is left sitting on the order until someone here explicitly decides
+        // what to do with it - recordRefund() only ever runs on that explicit
+        // click, never automatically.
+        if (pending < 0) {
+            var creditWrap = document.createElement("div");
+            creditWrap.className = "pos-credit-banner";
+
+            var creditBtn = document.createElement("button");
+            creditBtn.type = "button";
+            creditBtn.className = "pos-btn-secondary";
+            creditBtn.textContent = gettext("Record a refund");
+            creditBtn.title = gettext("Only records that the money was returned to the customer - this does not move any money itself.");
+            var creditMsg = document.createElement("div");
+            creditMsg.className = "pos-msg";
+            creditBtn.addEventListener("click", function () {
+                recordRefund(order, -pending, creditBtn, creditMsg);
+            });
+            creditWrap.appendChild(creditBtn);
+            creditWrap.appendChild(creditMsg);
+            orderDetailEl.appendChild(creditWrap);
+        }
 
         var list = document.createElement("div");
         renderPositionList(list);
@@ -1776,6 +1901,108 @@
             loadOrderDetail(order.code);
             // Same reasoning as payOrder()'s doSearch() call - the left-hand list
             // still shows this order's pre-cancellation status/color otherwise.
+            doSearch();
+        });
+    }
+
+    function deletePositionFromOrder(pos, btn, msg) {
+        if (!window.confirm(gettext("Cancel this position? This cannot be undone."))) return;
+        var order = currentOrder;
+        btn.disabled = true;
+        setMsg(msg, gettext("Canceling…"), null);
+        api(eventPath("/orderpositions/" + pos.id + "/"), {method: "DELETE"}).then(function (res) {
+            if (!res.ok) {
+                btn.disabled = false;
+                setMsg(msg, describeError(res.data), "error");
+                return;
+            }
+            loadOrderDetail(order.code);
+            doSearch();
+        });
+    }
+
+    // Adds one new position to an existing order. Tries a plain, seatless
+    // POST first - that's all most dates need (either unseated, or a
+    // manually-assigned date where a seat gets picked afterwards through the
+    // seatmap below, same as any other not-yet-seated position). Only a date
+    // where customers pick their own seat (seating_choice on) rejects that
+    // outright, with a structured {"seat": [...]} error (see the
+    // SeatRequiredError patch in orders.py/orderchange.py - without it this
+    // couldn't be told apart from any other validation failure without
+    // matching on message text, which is locale-dependent). For that case
+    // only, reuse Quick reservation's own grab-a-free-seat-then-release-it
+    // dance (assignQuickSeats()/releaseQuickSeats()) - it lands the new
+    // position in the same "needs seating" state as any other manually
+    // placed one, instead of holding a seat nobody actually chose. If the
+    // release itself fails, the position just keeps that seat and shows up
+    // seated in the list above - staff can unassign it from the seatmap
+    // below like any other misplaced seat, no separate recovery path needed.
+    function addPositionToOrder(subeventId, itemId, variationId, btn, msg) {
+        var order = currentOrder;
+        var body = {order: order.code, item: itemId};
+        if (variationId) body.variation = variationId;
+        if (subeventId != null) body.subevent = subeventId;
+
+        function attempt(seatGuid) {
+            var payload = seatGuid ? Object.assign({}, body, {seat: seatGuid}) : body;
+            return api(eventPath("/orderpositions/"), {method: "POST", body: JSON.stringify(payload)});
+        }
+
+        btn.disabled = true;
+        setMsg(msg, gettext("Adding…"), null);
+
+        attempt(null).then(function (res) {
+            if (res.ok) return {position: res.data};
+            if (!(res.data && res.data.seat)) return {error: describeError(res.data)};
+            var p = {item: itemId};
+            if (variationId) p.variation = variationId;
+            if (subeventId != null) p.subevent = subeventId;
+            return assignQuickSeats([p]).then(function (enough) {
+                if (!enough || !p.seat) {
+                    return {error: gettext("No free seats left for this item/date.")};
+                }
+                return attempt(p.seat).then(function (res2) {
+                    if (!res2.ok) return {error: describeError(res2.data)};
+                    return releaseQuickSeats([res2.data]).then(function (allReleased) {
+                        return {position: res2.data, releaseFailed: !allReleased};
+                    });
+                });
+            });
+        }).then(function (result) {
+            if (result.error) {
+                btn.disabled = false;
+                setMsg(msg, result.error, "error");
+                return;
+            }
+            // loadOrderDetail() rebuilds this whole panel (including this
+            // button/message), so there's nothing further to reset here even
+            // when releaseFailed - the rebuilt seat badge already shows it.
+            loadOrderDetail(order.code);
+            doSearch();
+        });
+    }
+
+    // Only ever runs on an explicit click (see the "credit owed" banner in
+    // renderOrderDetail()) - a lower total on an already-paid order never
+    // refunds anything on its own. "boxoffice" matches the provider identifier
+    // payOrder() already uses for cash/QR/card payments taken here; state
+    // "done" records it as already completed - this terminal doesn't have
+    // its own payment gateway to actually push money back through, so this
+    // is bookkeeping ("we gave the customer X back at the counter"), not an
+    // action that moves money itself.
+    function recordRefund(order, amount, btn, msg) {
+        btn.disabled = true;
+        setMsg(msg, gettext("Recording…"), null);
+        api(eventPath("/orders/" + order.code + "/refunds/"), {
+            method: "POST",
+            body: JSON.stringify({provider: "boxoffice", amount: amount.toFixed(2), state: "done", source: "admin"}),
+        }).then(function (res) {
+            if (!res.ok) {
+                btn.disabled = false;
+                setMsg(msg, describeError(res.data), "error");
+                return;
+            }
+            loadOrderDetail(order.code);
             doSearch();
         });
     }
