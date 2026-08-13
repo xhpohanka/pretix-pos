@@ -23,6 +23,7 @@
     var subeventSeatingPlans = {}; // subeventId -> true if that date has a seating plan at all
     var subeventDisabled = {}; // subeventId -> {items: {itemId: true}, variations: {variationId: true}}
     var subeventsList = []; // raw API results, ordered - used by the Quick reservation tab
+    var subeventSeatedItems = {}; // subeventId -> {itemId: true} - items with a seat category mapping on that date
 
     function loadState() {
         try {
@@ -547,6 +548,7 @@
             subeventPriceOverrides = {};
             subeventSeatingPlans = {};
             subeventDisabled = {};
+            subeventSeatedItems = {};
             subs.forEach(function (se) {
                 var opt = document.createElement("option");
                 opt.value = se.id;
@@ -574,6 +576,19 @@
                 });
                 subeventPriceOverrides[se.id] = {items: items, variations: variations};
                 subeventDisabled[se.id] = {items: disabledItems, variations: disabledVariations};
+
+                // Which items actually require a seat on this date, straight from
+                // the subevent's own category mapping - not inferred from whether
+                // the seatmap happens to return a free seat for that item, which
+                // also comes back empty when a date's seating was only half set
+                // up (a plan + mapping assigned, but its Seat rows never
+                // generated) and would otherwise be indistinguishable from a
+                // plain unseated date. See assignQuickSeats().
+                var seatedItems = {};
+                Object.keys(se.seat_category_mapping || {}).forEach(function (cat) {
+                    seatedItems[se.seat_category_mapping[cat]] = true;
+                });
+                subeventSeatedItems[se.id] = seatedItems;
             });
             loadForCurrentContext();
         });
@@ -1175,11 +1190,20 @@
                     if (s.status !== "free") return;
                     (freeByItem[s.product] = freeByItem[s.product] || []).push(s.seat_guid);
                 });
+                // Whether an item needs a seat at all comes from the date's own
+                // category mapping (subeventSeatedItems), not from whether the
+                // seatmap happened to return a free seat for it - a date can have
+                // a plan and mapping assigned but no Seat rows actually generated
+                // (a half-finished setup), which looks identical to "not seated"
+                // if judged only by an empty free-seat pool, and would otherwise
+                // let the create call through to fail with a raw API error later.
+                var seatedItems = seId != null ? (subeventSeatedItems[seId] || {}) : null;
                 var ok = true;
                 group.forEach(function (p) {
                     var pool = freeByItem[p.item];
-                    if (!pool) return;
-                    if (!pool.length) { ok = false; return; }
+                    var needsSeat = seatedItems ? !!seatedItems[p.item] : !!pool;
+                    if (!needsSeat) return;
+                    if (!pool || !pool.length) { ok = false; return; }
                     p.seat = pool.shift();
                 });
                 return ok;
