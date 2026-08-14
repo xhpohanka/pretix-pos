@@ -2637,59 +2637,86 @@
                 moves.push({position: pos, targetGuid: dest.guid});
             }
 
+            // Clears every seat in the block first, then assigns the new ones,
+            // one PATCH at a time - avoids "seat already taken" conflicts when
+            // the block shifts onto its own previously-occupied seats,
+            // regardless of move order. Used as a fallback (see moveBlock's
+            // main body below) since a single /change/ commit tracks the net
+            // seat diff across the whole block anyway, so it doesn't need
+            // this two-phase dance in the common case.
+            function moveBlockOneByOne(moves) {
+                var idx = 0;
+                function clearNext() {
+                    if (idx >= moves.length) {
+                        idx = 0;
+                        assignNext();
+                        return;
+                    }
+                    var m = moves[idx];
+                    idx += 1;
+                    api(eventPath("/orderpositions/" + m.position.id + "/"), {
+                        method: "PATCH",
+                        body: JSON.stringify({seat: null}),
+                    }).then(function (res) {
+                        if (res.ok) applyPositionSeat(m.position.id, null);
+                        clearNext();
+                    });
+                }
+                function assignNext() {
+                    if (idx >= moves.length) {
+                        setMsg(msgEl, gettext("Block moved."), "success");
+                        renderPositionList(positionListEl);
+                        render();
+                        refreshPayButtonState();
+                        return;
+                    }
+                    var m = moves[idx];
+                    idx += 1;
+                    api(eventPath("/orderpositions/" + m.position.id + "/"), {
+                        method: "PATCH",
+                        body: JSON.stringify({seat: m.targetGuid}),
+                    }).then(function (res) {
+                        if (res.ok) {
+                            applyPositionSeat(m.position.id, res.data.seat);
+                        } else {
+                            setMsg(msgEl, interpolate(gettext("Some seats failed to move: %(error)s"), {error: describeError(res.data)}, true), "error");
+                        }
+                        assignNext();
+                    });
+                }
+                clearNext();
+            }
+
             setMsg(msgEl, interpolate(
-                ngettext(
-                    "Moving %(n)s seat - this is not a single atomic action, a failure partway through leaves it partially done…",
-                    "Moving %(n)s seats - this is not a single atomic action, a failure partway through leaves it partially done…",
-                    moves.length
-                ),
+                ngettext("Moving %(n)s seat…", "Moving %(n)s seats…", moves.length),
                 {n: moves.length},
                 true
             ), null);
 
-            // Clear every seat in the block first, then assign the new ones -
-            // avoids "seat already taken" conflicts when the block shifts onto
-            // its own previously-occupied seats, regardless of move order.
-            var idx = 0;
-            function clearNext() {
-                if (idx >= moves.length) {
-                    idx = 0;
-                    assignNext();
-                    return;
-                }
-                var m = moves[idx];
-                idx += 1;
-                api(eventPath("/orderpositions/" + m.position.id + "/"), {
-                    method: "PATCH",
-                    body: JSON.stringify({seat: null}),
-                }).then(function (res) {
-                    if (res.ok) applyPositionSeat(m.position.id, null);
-                    clearNext();
-                });
-            }
-            function assignNext() {
-                if (idx >= moves.length) {
+            api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
+                method: "POST",
+                body: JSON.stringify({
+                    send_email: false,
+                    patch_positions: moves.map(function (m) {
+                        return {position: m.position.id, body: {seat: m.targetGuid}};
+                    }),
+                }),
+            }).then(function (res) {
+                if (res.ok) {
+                    var byId = {};
+                    (res.data.positions || []).forEach(function (p) { byId[p.id] = p; });
+                    moves.forEach(function (m) {
+                        if (byId[m.position.id]) applyPositionSeat(m.position.id, byId[m.position.id].seat);
+                    });
                     setMsg(msgEl, gettext("Block moved."), "success");
                     renderPositionList(positionListEl);
                     render();
                     refreshPayButtonState();
-                    return;
+                } else {
+                    setMsg(msgEl, interpolate(gettext("Batch move failed (%(error)s) - retrying one by one…"), {error: describeError(res.data)}, true), "error");
+                    moveBlockOneByOne(moves);
                 }
-                var m = moves[idx];
-                idx += 1;
-                api(eventPath("/orderpositions/" + m.position.id + "/"), {
-                    method: "PATCH",
-                    body: JSON.stringify({seat: m.targetGuid}),
-                }).then(function (res) {
-                    if (res.ok) {
-                        applyPositionSeat(m.position.id, res.data.seat);
-                    } else {
-                        setMsg(msgEl, interpolate(gettext("Some seats failed to move: %(error)s"), {error: describeError(res.data)}, true), "error");
-                    }
-                    assignNext();
-                });
-            }
-            clearNext();
+            });
         }
 
         render();

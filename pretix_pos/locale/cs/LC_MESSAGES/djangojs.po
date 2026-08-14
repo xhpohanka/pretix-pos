@@ -421,6 +421,17 @@ msgid "Cannot move block: target seats overlap."
 msgstr "Blok nelze přesunout: cílová místa se překrývají."
 
 #: static/pretix_pos/pos.js
+msgid "Moving %(n)s seat…"
+msgid_plural "Moving %(n)s seats…"
+msgstr[0] "Přesouvá se %(n)s místo…"
+msgstr[1] "Přesouvají se %(n)s místa…"
+msgstr[2] "Přesouvá se %(n)s míst…"
+
+#: static/pretix_pos/pos.js
+msgid "Batch move failed (%(error)s) - retrying one by one…"
+msgstr "Hromadný přesun selhal (%(error)s) - zkouší se jednotlivě…"
+
+#: static/pretix_pos/pos.js
 msgid ""
 "Moving %(n)s seat - this is not a single atomic action, a failure partway "
 "through leaves it partially done…"
