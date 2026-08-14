@@ -171,6 +171,19 @@
         return keys.length ? v[keys[0]] : "";
     }
 
+    // "date time - name" everywhere a subevent gets labeled (the date <select>
+    // options, which subeventLabel() itself just reads back, and the Quick
+    // reservation table's own date column) - one shared format instead of each
+    // call site building its own, and minutes only (toLocaleString() also
+    // includes seconds, which nobody needs for a date/time that's only ever
+    // set to whole minutes anyway).
+    function formatSubeventLabel(se) {
+        var d = new Date(se.date_from);
+        return d.toLocaleDateString() + " " +
+            d.toLocaleTimeString(undefined, {hour: "2-digit", minute: "2-digit"}) +
+            " - " + pickI18n(se.name);
+    }
+
     // The order-create endpoint's `positions` errors are an array with one
     // entry per submitted position (empty {} for positions with no error) -
     // a naive Array.isArray(v) ? v.join(" ") : ... (the previous approach)
@@ -582,7 +595,7 @@
             subs.forEach(function (se) {
                 var opt = document.createElement("option");
                 opt.value = se.id;
-                opt.textContent = pickI18n(se.name) + " — " + new Date(se.date_from).toLocaleString();
+                opt.textContent = formatSubeventLabel(se);
                 subeventSelect.appendChild(opt);
 
                 // Whether this date has a seating plan at all - used by
@@ -647,6 +660,13 @@
             placementPool = {};
             renderOrderDetail();
         }
+
+        // orderSortKey() now favors an order that still needs a seat on
+        // *this* date specifically (see orderNeedsSeatOnCurrentDate()) - that
+        // ranking is stale the moment the date changes, so re-run whatever's
+        // currently shown (default browse list or an active search) to
+        // re-sort against the new one.
+        doSearch();
     });
 
     function loadForCurrentContext() {
@@ -1158,7 +1178,7 @@
             var tr = document.createElement("tr");
             if (state.event.hasSubevents) {
                 var dateTd = document.createElement("td");
-                dateTd.textContent = pickI18n(se.name) + " — " + new Date(se.date_from).toLocaleString();
+                dateTd.textContent = formatSubeventLabel(se);
                 tr.appendChild(dateTd);
             }
             units.forEach(function (u) {
@@ -1441,6 +1461,21 @@
         return positions.every(function (p) { return !!p.seat; });
     }
 
+    // Whether o has an unseated position specifically on the date currently
+    // selected in the bar at the top (the one whose seatmap is actually on
+    // screen right now) - staff working that date's plan can seat this order
+    // immediately, unlike one that needs a seat on some *other* date, so it's
+    // worth its own top sort tier rather than lumping it in with "needs a
+    // seat somewhere". Always false for an event without subevents (no
+    // "current date" to be more specific than) or once nothing's selected.
+    function orderNeedsSeatOnCurrentDate(o) {
+        var seId = currentSubeventId();
+        if (seId == null) return false;
+        return (o.positions || []).some(function (p) {
+            return !p.canceled && subeventsMatch(p.subevent, seId) && dateHasSeatingPlan(p.subevent) && !p.seat;
+        });
+    }
+
     function orderSortKey(o) {
         // A canceled order's positions are canceled right along with it, so
         // orderIsSeated()'s "every position has a seat" is vacuously true
@@ -1449,10 +1484,11 @@
         // dropping to the very end, where nothing about it needs attention
         // anymore (a refund, if one's owed, is called out via pendingSum()
         // in renderSearchResults() instead).
-        if (o.status === "c") return 4;
+        if (o.status === "c") return 5;
+        if (orderNeedsSeatOnCurrentDate(o)) return 0;
         var needsSeat = !orderIsSeated(o);
         var unpaid = o.status !== "p";
-        return (needsSeat ? 0 : 2) + (unpaid ? 0 : 1);
+        return 1 + (needsSeat ? 0 : 2) + (unpaid ? 0 : 1);
     }
 
     // Shown by default on the "Find order" tab (before any search) so staff

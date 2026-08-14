@@ -287,6 +287,7 @@ button.pos-tab.active {
 }
 
 .pos-position-row input[type=checkbox] { width: auto; }
+.pos-position-row button.pos-btn-icon-danger { margin-left: auto; }
 
 .pos-position-row-other-date { opacity: 0.55; }
 .pos-date-badge { background: #cfe3f7; cursor: pointer; }
@@ -320,6 +321,7 @@ button.pos-tab.active {
     align-items: center;
     gap: 6px;
     font-weight: normal;
+    margin-left: auto;
 }
 
 button.pos-btn-add-position {
