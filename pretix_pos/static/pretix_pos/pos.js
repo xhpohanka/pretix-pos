@@ -2431,10 +2431,18 @@
 
             if (d.movePosition) {
                 var target = seatAtEvent(e);
-                if (target && target.status === "free") {
+                if (target) {
                     if (e.ctrlKey) {
+                        // Unlike the single-seat move below, don't require
+                        // target.status === "free" here - moveBlock() itself
+                        // already accepts a target that's merely occupied by
+                        // another seat of the *same* block (a shift or swap
+                        // within the dragged block), which is a valid move.
+                        // Requiring "free" at this outer gate would silently
+                        // reject exactly that valid case before moveBlock()
+                        // ever runs.
                         moveBlock(d.clickSeat, target);
-                    } else {
+                    } else if (target.status === "free") {
                         movePositionSeat(d.movePosition, target.guid);
                     }
                 }
