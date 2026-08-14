@@ -352,6 +352,24 @@ msgid "Place %(seats)s on %(positions)s"
 msgstr "Přiřadit %(seats)s na %(positions)s"
 
 #: static/pretix_pos/pos.js
+msgid "Placing %(n)s seat…"
+msgid_plural "Placing %(n)s seats…"
+msgstr[0] "Přiřazuje se %(n)s místo…"
+msgstr[1] "Přiřazují se %(n)s místa…"
+msgstr[2] "Přiřazuje se %(n)s míst…"
+
+#: static/pretix_pos/pos.js
+msgid "Placed %(n)s seat."
+msgid_plural "Placed %(n)s seats."
+msgstr[0] "Přiřazeno %(n)s místo."
+msgstr[1] "Přiřazena %(n)s místa."
+msgstr[2] "Přiřazeno %(n)s míst."
+
+#: static/pretix_pos/pos.js
+msgid "Batch placement failed (%(error)s) - retrying one by one…"
+msgstr "Hromadné přiřazení selhalo (%(error)s) - zkouší se jednotlivě…"
+
+#: static/pretix_pos/pos.js
 msgid ""
 "Placing seats one by one - this is not a single atomic action, a failure "
 "partway through leaves earlier placements in place…"

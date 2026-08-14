@@ -2459,16 +2459,17 @@
         };
         window.addEventListener("mouseup", seatMapMouseUpHandler);
 
-        placeBtn.addEventListener("click", function () {
-            var poolSeats = Object.keys(placementPool).map(function (g) { return placementPool[g]; });
-            var positionIds = Array.prototype.slice.call(positionListEl.querySelectorAll("input[type=checkbox]:checked"))
-                .map(function (cb) { return parseInt(cb.dataset.positionId, 10); });
-            var n = Math.min(poolSeats.length, positionIds.length);
-            if (!n) return;
-            poolSeats.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });
-            placeBtn.disabled = true;
+        // Places all selected seats in a single /change/ call (one shared
+        // OrderChangeManager, one commit) instead of one PATCH per seat - for
+        // a 100-seat order that turns 100 sequential round-trips into 1.
+        // The tradeoff is atomicity: if any seat in the batch got taken in
+        // the meantime, the whole commit is rejected and none are placed
+        // (core's _check_seats() only names the first conflicting seat it
+        // finds). That's rare for a batch a single till is actively placing,
+        // so on that failure we fall back to placeSeatsOneByOne(), which is
+        // slower but reports each seat's own success/failure like before.
+        function placeSeatsOneByOne(poolSeats, positionIds, n) {
             setMsg(msgEl, gettext("Placing seats one by one - this is not a single atomic action, a failure partway through leaves earlier placements in place…"), null);
-
             var i = 0, ok = 0, failed = [];
             function next() {
                 if (i >= n) {
@@ -2505,6 +2506,45 @@
                 });
             }
             next();
+        }
+
+        placeBtn.addEventListener("click", function () {
+            var poolSeats = Object.keys(placementPool).map(function (g) { return placementPool[g]; });
+            var positionIds = Array.prototype.slice.call(positionListEl.querySelectorAll("input[type=checkbox]:checked"))
+                .map(function (cb) { return parseInt(cb.dataset.positionId, 10); });
+            var n = Math.min(poolSeats.length, positionIds.length);
+            if (!n) return;
+            poolSeats.sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); });
+            placeBtn.disabled = true;
+            setMsg(msgEl, interpolate(ngettext("Placing %(n)s seat…", "Placing %(n)s seats…", n), {n: n}, true), null);
+
+            api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
+                method: "POST",
+                body: JSON.stringify({
+                    send_email: false,
+                    patch_positions: positionIds.slice(0, n).map(function (posId, idx) {
+                        return {position: posId, body: {seat: poolSeats[idx].guid}};
+                    }),
+                }),
+            }).then(function (res) {
+                if (res.ok) {
+                    var byId = {};
+                    (res.data.positions || []).forEach(function (p) { byId[p.id] = p; });
+                    for (var idx = 0; idx < n; idx++) {
+                        var posId = positionIds[idx];
+                        if (byId[posId]) applyPositionSeat(posId, byId[posId].seat);
+                    }
+                    setMsg(msgEl, interpolate(ngettext("Placed %(n)s seat.", "Placed %(n)s seats.", n), {n: n}, true), "success");
+                    placementPool = {};
+                    renderPositionList(positionListEl);
+                    render();
+                    renderPlaceBtn();
+                    refreshPayButtonState();
+                } else {
+                    setMsg(msgEl, interpolate(gettext("Batch placement failed (%(error)s) - retrying one by one…"), {error: describeError(res.data)}, true), "error");
+                    placeSeatsOneByOne(poolSeats, positionIds, n);
+                }
+            });
         });
 
         // Nested (rather than a standalone top-level function) so it can update
