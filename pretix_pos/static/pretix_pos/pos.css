@@ -205,6 +205,27 @@ button.pos-tab.active {
     max-width: 380px;
 }
 
+/* Edit-order tab only: split what pos-col-cart used to hold (search +
+   positions + summary/pay, all stacked in one unbounded column) into two
+   narrow columns instead - a long position list used to push the pay
+   button below the fold. Positions get their own capped, independently
+   scrolling column; the summary/pay column stays short regardless of how
+   many positions an order has. */
+.pos-col-positions {
+    flex: 1 1 260px;
+    max-width: 320px;
+}
+
+.pos-col-summary {
+    flex: 1 1 280px;
+    max-width: 360px;
+}
+
+#pos-order-positions {
+    max-height: 65vh;
+    overflow-y: auto;
+}
+
 .pos-item-row {
     padding: 10px 0;
     border-bottom: 1px solid #eee;
@@ -285,6 +306,11 @@ button.pos-tab.active {
     border-radius: 10px;
     box-shadow: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
     padding: 16px;
+    /* Keeps pay/cancel reachable without scrolling even if the search
+       results above it (own scroll, but still takes some vertical space)
+       plus this order's own summary add up to more than the viewport. */
+    position: sticky;
+    top: 16px;
 }
 
 .pos-position-row {

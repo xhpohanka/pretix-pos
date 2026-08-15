@@ -166,13 +166,20 @@
                             <h2>{% trans "Seating plan" %}</h2>
                             <div id="pos-order-seatmap-wrap" class="pos-msg">{% trans "Select an order to place or move seats." %}</div>
                         </div>
-                        <div class="pos-col pos-col-cart">
+                        <div class="pos-col pos-col-positions">
+                            <div id="pos-order-positions" class="pos-msg">{% trans "Select an order to see its positions." %}</div>
+                        </div>
+                        <div class="pos-col pos-col-summary">
+                            <div id="pos-order-detail" hidden></div>
                             <div class="pos-search-bar">
                                 <input type="text" id="pos-search" placeholder="{% trans "Order code, name, e-mail…" %}">
                                 <button id="pos-search-btn" type="button">{% trans "Search" %}</button>
                             </div>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 8px; margin-top: 4px;">
+                                <input type="checkbox" id="pos-filter-current-date">
+                                <span>{% trans "This date only" %}</span>
+                            </label>
                             <div id="pos-search-results"></div>
-                            <div id="pos-order-detail" hidden></div>
                         </div>
                     </div>
                 </div>

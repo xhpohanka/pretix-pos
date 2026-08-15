@@ -1368,7 +1368,9 @@
     var searchBtn = document.getElementById("pos-search-btn");
     var searchResultsEl = document.getElementById("pos-search-results");
     var orderDetailEl = document.getElementById("pos-order-detail");
+    var orderPositionsWrapEl = document.getElementById("pos-order-positions");
     var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
+    var filterCurrentDateCheckbox = document.getElementById("pos-filter-current-date");
 
     // Set by renderOrderDetail() (only while the loaded order is still "n"/pending),
     // kept at module level so seat placement/move/removal - all in initOrderSeatMap(),
@@ -1435,6 +1437,7 @@
     searchInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
+    filterCurrentDateCheckbox.addEventListener("change", doSearch);
 
     // A position only "needs a seat" if its date actually has a seating plan
     // at all - a date with none can never have any seated position, so those
@@ -1519,11 +1522,21 @@
 
     function renderSearchResults(orders) {
         searchResultsEl.innerHTML = "";
-        if (!orders.length) {
+        // Filter by current date if checkbox is checked
+        var filtered = orders;
+        if (filterCurrentDateCheckbox.checked) {
+            var seId = currentSubeventId();
+            if (seId) {
+                filtered = orders.filter(function (o) {
+                    return (o.positions || []).some(function (p) { return p.subevent == seId; });
+                });
+            }
+        }
+        if (!filtered.length) {
             searchResultsEl.textContent = gettext("No matching orders.");
             return;
         }
-        orders.forEach(function (o) {
+        filtered.forEach(function (o) {
             var div = document.createElement("div");
             // Canceled (grey, sorted last by orderSortKey()) takes priority
             // over the seated/paid coloring below - a canceled order's own
@@ -1562,6 +1575,7 @@
             if (!res.ok) {
                 orderDetailEl.hidden = false;
                 orderDetailEl.textContent = describeError(res.data);
+                orderPositionsWrapEl.textContent = "";
                 return;
             }
             currentOrder = res.data;
@@ -1928,12 +1942,18 @@
         orderDetailEl.appendChild(orderTotalEl);
         orderCreditEl = document.createElement("div");
         orderDetailEl.appendChild(orderCreditEl);
-        orderListEl = document.createElement("div");
-        orderDetailEl.appendChild(orderListEl);
         orderPayBlockEl = document.createElement("div");
         orderDetailEl.appendChild(orderPayBlockEl);
         orderCancelBlockEl = document.createElement("div");
         orderDetailEl.appendChild(orderCancelBlockEl);
+
+        // Positions get their own column (see #pos-order-positions in
+        // pos.html/pos.css) instead of living inside orderDetailEl - a long
+        // position list would otherwise push the pay/cancel buttons below
+        // the fold along with everything else stacked in that column.
+        orderPositionsWrapEl.innerHTML = "";
+        orderListEl = document.createElement("div");
+        orderPositionsWrapEl.appendChild(orderListEl);
 
         refreshOrderSummary();
 
