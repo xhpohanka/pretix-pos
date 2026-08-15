@@ -466,3 +466,11 @@ msgid ""
 msgstr ""
 "Nelze u serveru ověřit, zda je akce v testovacím režimu – před prodejem "
 "načtěte stránku znovu."
+
+#: static/pretix_pos/pos.js
+msgid "Decrease quantity"
+msgstr "Snížit počet"
+
+#: static/pretix_pos/pos.js
+msgid "Increase quantity"
+msgstr "Zvýšit počet"

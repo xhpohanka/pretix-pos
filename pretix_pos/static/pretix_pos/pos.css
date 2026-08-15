@@ -428,11 +428,53 @@ button.pos-btn-add-position {
     white-space: nowrap;
 }
 
-.pos-quick-table input.pos-quick-qty {
-    width: 70px;
-    max-width: none;
-    display: inline-block;
+/* Mirrors the shop frontend's quantity stepper (core's
+   .input-item-count-group): one flush unit of -, field, +, with the native
+   spinners hidden. Sized for fingers, not a mouse - this is the tab staff
+   use for phone/counter bookings. */
+.pos-qty-group {
+    display: inline-flex;
+    align-items: stretch;
+    vertical-align: middle;
 }
+
+.pos-quick-table input.pos-quick-qty {
+    font: inherit;
+    width: 54px;
+    max-width: none;
+    padding: 7px 4px;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.pos-quick-table input.pos-quick-qty::-webkit-outer-spin-button,
+.pos-quick-table input.pos-quick-qty::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+button.pos-qty-btn {
+    width: 38px;
+    padding: 0;
+    font-size: 18px;
+    line-height: 1;
+    font-weight: 600;
+    color: #333;
+    background: #f2f2f2;
+    border: 1px solid #ccc;
+}
+
+button.pos-qty-btn:hover {
+    background: #e6e6e6;
+}
+
+button.pos-qty-dec { border-radius: 6px 0 0 6px; }
+button.pos-qty-inc { border-radius: 0 6px 6px 0; }
 
 .pos-quick-price {
     margin-left: 6px;

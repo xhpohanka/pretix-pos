@@ -1242,7 +1242,7 @@
                     input.dataset.itemId = u.itemId;
                     if (u.variationId) input.dataset.variationId = u.variationId;
                     if (seId != null) input.dataset.subeventId = seId;
-                    td.appendChild(input);
+                    td.appendChild(buildQtyStepper(input));
                     var price = document.createElement("span");
                     price.className = "pos-quick-price";
                     price.textContent = fmtMoney(priceFor(u.itemId, u.variationId, seId));
@@ -1255,6 +1255,41 @@
         table.appendChild(tbody);
         quickTableEl.appendChild(table);
     }
+
+    // Same -/+ stepper the shop frontend puts around its quantity fields
+    // (core's .input-item-count-group): the native number spinners are far
+    // too small to hit reliably at a till, especially on a touchscreen.
+    function buildQtyStepper(input) {
+        var group = document.createElement("div");
+        group.className = "pos-qty-group";
+        group.appendChild(qtyStepButton(-1, "−", gettext("Decrease quantity")));
+        group.appendChild(input);
+        group.appendChild(qtyStepButton(1, "+", gettext("Increase quantity")));
+        return group;
+    }
+
+    function qtyStepButton(step, label, ariaLabel) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pos-qty-btn " + (step < 0 ? "pos-qty-dec" : "pos-qty-inc");
+        btn.dataset.step = step;
+        btn.textContent = label;
+        btn.setAttribute("aria-label", ariaLabel);
+        return btn;
+    }
+
+    // Delegated so it survives renderQuickTable() rebuilding the whole table.
+    quickTableEl.addEventListener("click", function (e) {
+        var btn = e.target.closest(".pos-qty-btn");
+        if (!btn) return;
+        var input = btn.parentNode.querySelector(".pos-quick-qty");
+        if (!input) return;
+        var step = parseInt(btn.dataset.step, 10);
+        var min = parseInt(input.min, 10) || 0;
+        var next = (parseInt(input.value, 10) || 0) + step;
+        input.value = Math.max(min, input.max ? Math.min(parseInt(input.max, 10), next) : next);
+        input.dispatchEvent(new Event("change", {bubbles: true}));
+    });
 
     function buildQuickPositions() {
         var positions = [];
