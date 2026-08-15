@@ -255,3 +255,19 @@ msgstr "Kód objednávky, jméno, e-mail…"
 #: templates/pretix_pos/organizer/pos.html:156
 msgid "Search"
 msgstr "Hledat"
+
+#: templates/pretix_pos/organizer/pos.html:28
+msgid ""
+"Test mode - nothing sold here is a real ticket, and every order stays "
+"deletable."
+msgstr ""
+"Testovací režim – nic prodaného zde není skutečná vstupenka a každou "
+"objednávku lze smazat."
+
+#: templates/pretix_pos/organizer/pos.html:174
+msgid "Select an order to see its positions."
+msgstr "Vyberte objednávku pro zobrazení jejích pozic."
+
+#: templates/pretix_pos/organizer/pos.html:184
+msgid "This date only"
+msgstr "Jen tento termín"

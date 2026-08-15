@@ -244,6 +244,7 @@
     }
 
     var headerInfo = document.getElementById("pos-header-info");
+    var testmodeBanner = document.getElementById("pos-testmode-banner");
     var btnChangeEvent = document.getElementById("pos-btn-change-event");
     var btnUnpair = document.getElementById("pos-btn-unpair");
     var btnTill = document.getElementById("pos-btn-till");
@@ -431,6 +432,11 @@
                         // subevents track this per-date instead, in
                         // subeventSeatingPlans (loadSubevents()).
                         seatingPlan: ev.seating_plan || null,
+                        // Refreshed on every boot by loadEventInfo() - an
+                        // organizer can flip test mode at any time, so what
+                        // matters is its value at the moment of the sale, not
+                        // at pairing time.
+                        testmode: !!ev.testmode,
                     };
                     saveState();
                     boot();
@@ -531,7 +537,7 @@
         activeSeatItem = null;
         renderCart();
 
-        Promise.all([loadItemsIndex(), loadQuotas()]).then(function () {
+        Promise.all([loadEventInfo(), loadItemsIndex(), loadQuotas()]).then(function () {
             if (state.event.hasSubevents) {
                 subeventBar.hidden = false;
                 loadSubevents().then(loadQuickReservationTab);
@@ -541,6 +547,40 @@
                 loadQuickReservationTab();
             }
         });
+    }
+
+    // Whether we currently know the event's test mode for sure. Terminals
+    // paired before test mode was honoured have a cached state.event with no
+    // testmode key at all, so "no cached value and the refresh failed" is a
+    // real state - and one we must not silently resolve to "live", or a test
+    // sale becomes an undeletable real order (core only ever allows deleting
+    // test mode orders). submitOrder()/submitQuickOrder() refuse to sell
+    // while this is false rather than guess.
+    var testmodeKnown = false;
+
+    function loadEventInfo() {
+        return api(eventPath("/")).then(function (res) {
+            if (!res.ok || !res.data) {
+                // Keep whatever a previous boot stored - a transient failure
+                // shouldn't change how orders are tagged.
+                testmodeKnown = typeof state.event.testmode === "boolean";
+                renderTestmodeBanner();
+                return;
+            }
+            state.event.testmode = !!res.data.testmode;
+            state.event.name = pickI18n(res.data.name);
+            saveState();
+            testmodeKnown = true;
+            headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
+            renderTestmodeBanner();
+        });
+    }
+
+    // Staff have no other way to tell a test-mode terminal from a live one,
+    // and the difference matters: in test mode nothing sold here is a real
+    // ticket, and every order stays deletable.
+    function renderTestmodeBanner() {
+        testmodeBanner.hidden = !(testmodeKnown && state.event && state.event.testmode);
     }
 
     function loadItemsIndex() {
@@ -1062,11 +1102,15 @@
             // search already matches against (core's OrderFilter.search_qs).
             positions.forEach(function (p) { p.attendee_name = name; });
         }
+        if (!testmodeKnown) {
+            setMsg(sellMsg, gettext("Can't reach the server to check whether this event is in test mode - reload the page before selling."), "error");
+            return;
+        }
         var method = paymentMethodSelect.value;
         btnReserve.disabled = true;
         btnSell.disabled = true;
         setMsg(sellMsg, gettext("Submitting…"), null);
-        var body = {status: mode === "sell" ? "p" : "n", positions: positions};
+        var body = {status: mode === "sell" ? "p" : "n", positions: positions, testmode: !!state.event.testmode};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
         if (mode === "sell") {
@@ -1338,10 +1382,14 @@
             setMsg(quickMsg, gettext("Enter an e-mail or a name before reserving - otherwise there's no way to find this order again later."), "error");
             return;
         }
+        if (!testmodeKnown) {
+            setMsg(quickMsg, gettext("Can't reach the server to check whether this event is in test mode - reload the page before selling."), "error");
+            return;
+        }
         if (name) positions.forEach(function (p) { p.attendee_name = name; });
         quickBtnReserve.disabled = true;
         setMsg(quickMsg, gettext("Submitting…"), null);
-        var body = {status: "n", positions: positions};
+        var body = {status: "n", positions: positions, testmode: !!state.event.testmode};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
         createQuickOrder(body, positions).then(function (result) {
@@ -2764,6 +2812,10 @@
 
     function boot() {
         tillPanel.hidden = true;
+        // Re-shown by loadEventInfo() once this event's test mode is known -
+        // otherwise switching events would leave the old event's banner up.
+        testmodeKnown = false;
+        testmodeBanner.hidden = true;
         if (!state.token) {
             showScreen("pair");
             btnChangeEvent.hidden = true;

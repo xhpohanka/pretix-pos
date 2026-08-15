@@ -87,6 +87,16 @@ h3 { font-size: 15px; }
 
 .pos-header-spacer { flex: 1; }
 
+/* Deliberately loud: staff must never mistake a test-mode terminal for a
+   live one - see renderTestmodeBanner() in pos.js. */
+#pos-testmode-banner {
+    padding: 8px 18px;
+    background: #f0ad4e;
+    color: #3a2a06;
+    font-weight: 600;
+    text-align: center;
+}
+
 button.pos-btn-link {
     background: none;
     border: none;

@@ -458,3 +458,11 @@ msgstr "Některá místa se nepodařilo přesunout: %(error)s"
 
 #~ msgid "Add a ticket for this date"
 #~ msgstr "Přidat vstupenku na tento termín"
+
+#: static/pretix_pos/pos.js
+msgid ""
+"Can't reach the server to check whether this event is in test mode - reload "
+"the page before selling."
+msgstr ""
+"Nelze u serveru ověřit, zda je akce v testovacím režimu – před prodejem "
+"načtěte stránku znovu."
