@@ -309,8 +309,10 @@ button.pos-tab.active {
 .pos-search-result.pos-order-canceled { background: #eee; border-color: #ccc; color: #777; }
 .pos-search-result.pos-order-canceled:hover { background: #e2e2e2; }
 
+/* First thing in the summary column, so there's nothing above to separate
+   from - the gap belongs underneath it, where the search bar follows. */
 #pos-order-detail {
-    margin-top: 16px;
+    margin-bottom: 16px;
     background: #fff;
     border: 1px solid #ddd;
     border-radius: 10px;
@@ -559,4 +561,64 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     font-size: 11px;
     vertical-align: super;
     color: #888;
+}
+
+/* Payment method and its button on one line. The select's default full width
+   would otherwise drop the button below it. */
+.pos-pay-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pos-pay-row select {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+}
+
+.pos-pay-row button {
+    flex: 0 0 auto;
+}
+
+/* QR payment overlay: the customer scans this from the other side of the
+   counter, so it takes over the screen rather than sitting in the narrow
+   summary column where the code would come out too small to read. */
+.pos-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 24, 28, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 100;
+}
+
+.pos-overlay-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 460px;
+    width: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+    text-align: center;
+}
+
+.pos-qr {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    height: auto;
+    margin: 0 auto 16px;
+}
+
+.pos-qr-line {
+    margin: 4px 0;
+    font-size: 15px;
+}
+
+.pos-overlay-box button {
+    margin-top: 16px;
 }

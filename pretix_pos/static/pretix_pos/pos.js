@@ -68,6 +68,10 @@
         {value: "qr", label: gettext("QR transfer")},
         {value: "card", label: gettext("Card")},
     ];
+    // pretix-cz-banktransfer's provider identifier. Picking "QR transfer" books
+    // a payment with this provider, so the variable symbol, the scannable code
+    // and the later bank matching all come from the one plugin that owns them.
+    var BANK_TRANSFER_PROVIDER = "czbanktransfer";
     var till = loadTill();
 
     function loadTill() {
@@ -1974,6 +1978,13 @@
         payMethodSelect = null;
         seatHintEl = null;
         if (order.status === "n") {
+            // Method and button belong together on one line - the select is a
+            // full-width block by default, which pushed the button onto a line
+            // of its own for no reason.
+            var payRow = document.createElement("div");
+            payRow.className = "pos-pay-row";
+            orderPayBlockEl.appendChild(payRow);
+
             payMethodSelect = document.createElement("select");
             PAYMENT_METHODS.forEach(function (m) {
                 var opt = document.createElement("option");
@@ -1981,19 +1992,61 @@
                 opt.textContent = m.label;
                 payMethodSelect.appendChild(opt);
             });
-            orderPayBlockEl.appendChild(payMethodSelect);
+            payRow.appendChild(payMethodSelect);
 
             payBtn = document.createElement("button");
             payBtn.type = "button";
             payBtn.className = "pos-btn-primary";
             payBtn.textContent = gettext("Take payment");
             payBtn.addEventListener("click", function () { payOrder(order, payMethodSelect.value); });
-            orderPayBlockEl.appendChild(payBtn);
+            payRow.appendChild(payBtn);
 
             seatHintEl = document.createElement("p");
             seatHintEl.className = "pos-hint";
             seatHintEl.textContent = gettext("Assign a seat to every position (for every date) before taking payment.");
             orderPayBlockEl.appendChild(seatHintEl);
+
+            // A transfer already waiting on this order - either booked here a
+            // moment ago, or by the customer online before they walked in. Both
+            // want the same two things: show the customer the code again, and
+            // settle it once the money is visible in the bank.
+            var bankPayment = (order.payments || []).find(function (p) {
+                return p.provider === BANK_TRANSFER_PROVIDER && (p.state === "created" || p.state === "pending");
+            });
+            if (bankPayment) {
+                var bankRow = document.createElement("div");
+                bankRow.className = "pos-pay-row";
+                var bankMsg = document.createElement("div");
+                bankMsg.className = "pos-msg";
+
+                var qrBtn = document.createElement("button");
+                qrBtn.type = "button";
+                qrBtn.className = "pos-btn-secondary";
+                qrBtn.textContent = gettext("Show QR code");
+                qrBtn.addEventListener("click", function () { showBankQr(bankPayment); });
+                bankRow.appendChild(qrBtn);
+
+                // Deliberately not gated on orderIsSeated() the way "Take
+                // payment" is. That gate stops staff collecting money for a
+                // seat that might not exist; here the money has already been
+                // transferred, and refusing to record it would help nobody -
+                // the order would simply read as unpaid until the bank matching
+                // confirmed the same thing anyway. A paid-but-unseated order is
+                // a state this terminal already handles (it sorts and colors
+                // them apart in the list, and pretix_seatmap withholds the
+                // ticket until every position has a seat).
+                var arrivedBtn = document.createElement("button");
+                arrivedBtn.type = "button";
+                arrivedBtn.className = "pos-btn-primary";
+                arrivedBtn.textContent = gettext("Payment received");
+                arrivedBtn.addEventListener("click", function () {
+                    confirmBankPayment(order, bankPayment, arrivedBtn, bankMsg);
+                });
+                bankRow.appendChild(arrivedBtn);
+
+                orderPayBlockEl.appendChild(bankRow);
+                orderPayBlockEl.appendChild(bankMsg);
+            }
 
             // Taking cash before every seatable position actually has a seat risks
             // collecting money for a seat that turns out not to exist -
@@ -2229,11 +2282,33 @@
                     true
                 ), "error");
             }
+            // A QR transfer is a real bank transfer, so it gets the bank
+            // transfer provider's own payment rather than a box-office one
+            // tagged "qr": that's what allocates a variable symbol, produces
+            // the SPAYD code the customer scans, and lets the bank matching
+            // recognise the money when it lands. It therefore stays *pending* -
+            // nothing has been received yet at the moment staff press the
+            // button - and is confirmed later, either by that matching or by
+            // staff pressing "Payment received" once they see it in the bank.
+            if (method === "qr") {
+                return api(eventPath("/orders/" + order.code + "/payments/"), {
+                    method: "POST",
+                    body: JSON.stringify({provider: BANK_TRANSFER_PROVIDER, amount: amount, state: "pending"}),
+                }).then(function (res) {
+                    if (!res.ok) {
+                        setMsg(msg, describeError(res.data), "error");
+                        return;
+                    }
+                    showBankQr(res.data);
+                    setMsg(msg, gettext("Waiting for the transfer - the order stays unpaid until the money arrives."), null);
+                    loadOrderDetail(order.code);
+                    doSearch();
+                });
+            }
             return api(eventPath("/orders/" + order.code + "/payments/"), {
                 method: "POST",
                 body: JSON.stringify({provider: "boxoffice", amount: amount, state: "created", info: {payment_type: method}}),
-            });
-        }).then(function (res) {
+            }).then(function (res) {
             if (!res.ok) {
                 setMsg(msg, describeError(res.data), "error");
                 return null;
@@ -2255,7 +2330,87 @@
             // (default browse list or an active search), same as any other
             // trigger for that list.
             doSearch();
+            });
         });
+    }
+
+    // Everything shown here comes from the payment's own `details`, which the
+    // bank transfer provider fills in server-side (api_payment_details) - the
+    // variable symbol it allocated, the account, and a ready-made QR image.
+    // Nothing about SPAYD is reimplemented in this terminal.
+    function showBankQr(payment) {
+        var d = (payment && payment.details) || {};
+        if (!d.qr_code) {
+            window.alert(gettext("This payment has no QR code - check that the bank transfer provider is configured for this event."));
+            return;
+        }
+        var overlay = document.createElement("div");
+        overlay.className = "pos-overlay";
+
+        var box = document.createElement("div");
+        box.className = "pos-overlay-box";
+        overlay.appendChild(box);
+
+        var h = document.createElement("h2");
+        h.textContent = gettext("Scan to pay");
+        box.appendChild(h);
+
+        var img = document.createElement("img");
+        img.className = "pos-qr";
+        img.src = d.qr_code;
+        img.alt = gettext("QR payment code");
+        box.appendChild(img);
+
+        [
+            [gettext("Amount"), fmtMoney(payment.amount)],
+            [gettext("Account"), d.domestic_account],
+            [gettext("Variable symbol"), d.variable_symbol],
+            [gettext("Recipient"), d.recipient_name],
+        ].forEach(function (row) {
+            if (!row[1]) return;
+            var p = document.createElement("p");
+            p.className = "pos-qr-line";
+            var label = document.createElement("span");
+            label.textContent = row[0] + ": ";
+            var value = document.createElement("strong");
+            value.textContent = row[1];
+            p.appendChild(label);
+            p.appendChild(value);
+            box.appendChild(p);
+        });
+
+        var close = document.createElement("button");
+        close.type = "button";
+        close.textContent = gettext("Close");
+        close.addEventListener("click", function () { overlay.remove(); });
+        box.appendChild(close);
+
+        // Clicking the backdrop closes too, but a click *inside* the box must
+        // not - staff read the account number off it and will click it.
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) overlay.remove();
+        });
+        document.body.appendChild(overlay);
+    }
+
+    // Staff watching their banking app can settle the order the moment they see
+    // the transfer, instead of waiting for the periodic bank matching - which is
+    // the whole reason a customer standing at the counter can pay this way at
+    // all. The till only counts the money here, not when the QR was shown.
+    function confirmBankPayment(order, payment, btn, msg) {
+        btn.disabled = true;
+        setMsg(msg, gettext("Confirming…"), null);
+        api(eventPath("/orders/" + order.code + "/payments/" + payment.local_id + "/confirm/"), {method: "POST"})
+            .then(function (res) {
+                if (!res.ok) {
+                    btn.disabled = false;
+                    setMsg(msg, describeError(res.data), "error");
+                    return;
+                }
+                addToTill("qr", payment.amount);
+                loadOrderDetail(order.code);
+                doSearch();
+            });
     }
 
     function cancelOrder(order, btn, msg) {

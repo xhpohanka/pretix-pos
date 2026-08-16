@@ -572,3 +572,57 @@ msgstr ""
 #, python-format
 msgid "Batch clearing failed (%(error)s) - retrying one by one…"
 msgstr "Hromadné zrušení selhalo (%(error)s) – zkouším jedno po druhém…"
+
+#: static/pretix_pos/pos.js
+msgid "Scan to pay"
+msgstr "Naskenujte pro platbu"
+
+#: static/pretix_pos/pos.js
+msgid "QR payment code"
+msgstr "QR kód pro platbu"
+
+#: static/pretix_pos/pos.js
+msgid "Amount"
+msgstr "Částka"
+
+#: static/pretix_pos/pos.js
+msgid "Account"
+msgstr "Číslo účtu"
+
+#: static/pretix_pos/pos.js
+msgid "Variable symbol"
+msgstr "Variabilní symbol"
+
+#: static/pretix_pos/pos.js
+msgid "Recipient"
+msgstr "Příjemce"
+
+#: static/pretix_pos/pos.js
+msgid "Close"
+msgstr "Zavřít"
+
+#: static/pretix_pos/pos.js
+msgid "Show QR code"
+msgstr "Zobrazit QR kód"
+
+#: static/pretix_pos/pos.js
+msgid "Payment received"
+msgstr "Platba dorazila"
+
+#: static/pretix_pos/pos.js
+msgid "Confirming…"
+msgstr "Potvrzuji…"
+
+#: static/pretix_pos/pos.js
+msgid ""
+"Waiting for the transfer - the order stays unpaid until the money arrives."
+msgstr ""
+"Čeká se na převod – objednávka zůstane nezaplacená, dokud peníze nedorazí."
+
+#: static/pretix_pos/pos.js
+msgid ""
+"This payment has no QR code - check that the bank transfer provider is "
+"configured for this event."
+msgstr ""
+"K této platbě není QR kód – zkontrolujte, že je pro tuto akci nastavená "
+"platební metoda bankovním převodem."
