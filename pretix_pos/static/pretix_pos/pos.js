@@ -18,6 +18,17 @@
     var activeSeatItem = null;
     var currentOrder = null;
     var placementPool = {}; // seat_guid -> seat, pending bulk placement on the loaded order
+    // seat_guid -> seat, this order's own seats staged for bulk removal. Removing
+    // a seat used to happen on a bare click, which put a destructive action one
+    // stray click away on a map staff pan around constantly - it now mirrors
+    // placement exactly: select first, then press the action button.
+    var removalPool = {};
+    // Colour a seat staged for removal is ringed in. Deliberately neither
+    // MINE_COLOR ("assigned, staying put") nor SELECTED_COLOR ("about to be
+    // placed") - staging to place and staging to clear are opposite actions and
+    // must not look alike. Matches pos-btn-danger, so the ring and the button
+    // that acts on it read as one thing.
+    var REMOVAL_COLOR = "#c62828";
     var orderSeats = [];
     var subeventPriceOverrides = {}; // subeventId -> {items: {itemId: price}, variations: {variationId: price}}
     var subeventSeatingPlans = {}; // subeventId -> true if that date has a seating plan at all
@@ -698,6 +709,7 @@
         // the new date's identically-numbered seat instead.
         if (currentOrder) {
             placementPool = {};
+            removalPool = {};
             renderOrderDetail();
         }
 
@@ -1663,6 +1675,7 @@
             }
             currentOrder = res.data;
             placementPool = {};
+            removalPool = {};
             renderOrderDetail();
         });
     }
@@ -2066,6 +2079,46 @@
         placeMsg.id = "pos-place-msg";
         placeMsg.className = "pos-msg";
 
+        function setSeatmapHelp() {
+            var title = document.getElementById("pos-order-seatmap-title");
+            if (!title) return;
+            title.title = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. What clicking does depends on the checkboxes in the position list: with positions checked you are placing seats, so clicks and rectangle drags pick free seats; with nothing checked you are clearing seats, so they pick this order's own seats instead. Either way the selection is only staged - shown with a ring - until you press the button next to the legend, and clicking empty space clears it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
+        }
+
+        function legendItem(swatchStyle, text) {
+            var li = document.createElement("li");
+            var sw = document.createElement("span");
+            sw.className = "pos-legend-swatch";
+            Object.keys(swatchStyle).forEach(function (k) { sw.style[k] = swatchStyle[k]; });
+            li.appendChild(sw);
+            li.appendChild(document.createTextNode(" " + text));
+            return li;
+        }
+
+        function buildSeatmapLegend() {
+            var R = window.PretixSeatingRenderer;
+            var ul = document.createElement("ul");
+            ul.className = "pos-legend";
+            // "Free" has no single colour to show - a free seat is painted in its
+            // own seating category's colour, which is per-plan - so that row says
+            // so in words rather than showing a swatch that would be wrong for
+            // every plan but one.
+            var free = document.createElement("li");
+            free.textContent = gettext("free — shown in its own seating category's color");
+            ul.appendChild(free);
+            ul.appendChild(legendItem({background: "#777777"}, gettext("unavailable")));
+            ul.appendChild(legendItem({background: R.MINE_COLOR}, gettext("this order's seats")));
+            ul.appendChild(legendItem(
+                {background: "transparent", boxShadow: "inset 0 0 0 2px " + R.SELECTED_COLOR},
+                gettext("selected to place")
+            ));
+            ul.appendChild(legendItem(
+                {background: "transparent", boxShadow: "inset 0 0 0 2px " + REMOVAL_COLOR},
+                gettext("selected to clear")
+            ));
+            return ul;
+        }
+
         seatMapPromise.then(function (info) {
             orderSeats = info.results;
             orderSeatmapWrapEl.innerHTML = "";
@@ -2078,21 +2131,29 @@
                 return;
             }
 
-            var hint = document.createElement("p");
-            hint.className = "pos-hint";
-            hint.textContent = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. Click a free seat (or drag a rectangle over several) to select up to as many as there are checked positions - shown with a ring only until you click \"Place selected\"; click empty space to clear that selection. Click one of this order's own seats to remove it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
-            orderSeatmapWrapEl.appendChild(hint);
+            // The full how-it-works text used to sit here as a paragraph, which
+            // on a busy order pushed the map (and the action button under it)
+            // well down the screen for something staff read once. It's now the
+            // heading's tooltip, with a colour legend in its place - the same
+            // trade the eshop picker already makes.
+            setSeatmapHelp();
+
+            var bar = document.createElement("div");
+            bar.className = "pos-seatmap-bar";
+            bar.appendChild(buildSeatmapLegend());
+
+            var placeBtn = document.createElement("button");
+            placeBtn.type = "button";
+            placeBtn.className = "pos-btn-primary";
+            orderSeatmapWrapEl.appendChild(bar);
+            // Sits in the bar next to the legend rather than under the map:
+            // below a 16-row plan it was off-screen exactly when it was needed.
+            bar.appendChild(placeBtn);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             svg.id = "pos-svg-order";
             svg.setAttribute("class", "pos-seatmap");
             orderSeatmapWrapEl.appendChild(svg);
-
-            var placeBtn = document.createElement("button");
-            placeBtn.type = "button";
-            placeBtn.textContent = gettext("Place selected seats on checked positions");
-            placeBtn.style.marginTop = "10px";
-            orderSeatmapWrapEl.appendChild(placeBtn);
             orderSeatmapWrapEl.appendChild(placeMsg);
 
             orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, placeMsg, orderListEl, seId);
@@ -2347,22 +2408,28 @@
         }
 
         function colorFn(s) {
-            if (placementPool[s.guid]) return "transparent";
+            // Both staged states drop the fill: an outline reads as "not settled
+            // yet", which is true of a seat about to be placed and equally true
+            // of one about to be cleared.
+            if (placementPool[s.guid] || removalPool[s.guid]) return "transparent";
             if (isOwnSeat(s)) return window.PretixSeatingRenderer.MINE_COLOR;
             return window.PretixSeatingRenderer.seatColor(s);
         }
 
         function strokeFn(s) {
             if (placementPool[s.guid]) return {color: window.PretixSeatingRenderer.SELECTED_COLOR, width: 3};
+            if (removalPool[s.guid]) return {color: REMOVAL_COLOR, width: 3};
             if (isOwnSeat(s)) return {color: window.PretixSeatingRenderer.MINE_COLOR, width: 3};
             return null;
         }
 
         function labelColorFn(s) {
-            // Only the transparent-fill "pool" state needs a label color override
+            // Only the transparent-fill staged states need a label color override
             // (white-on-transparent is invisible) - MINE_COLOR's fill is solid, so
             // the default white seat-number label already reads fine on it.
-            return placementPool[s.guid] ? window.PretixSeatingRenderer.SELECTED_COLOR : null;
+            if (placementPool[s.guid]) return window.PretixSeatingRenderer.SELECTED_COLOR;
+            if (removalPool[s.guid]) return REMOVAL_COLOR;
+            return null;
         }
 
         function render() {
@@ -2378,15 +2445,48 @@
             return positionListEl.querySelectorAll("input[type=checkbox]:checked").length;
         }
 
-        function renderPlaceBtn() {
-            var n = Object.keys(placementPool).length;
-            var checked = Array.prototype.slice.call(positionListEl.querySelectorAll("input[type=checkbox]:checked"));
-            var seatsPart = interpolate(ngettext("%(n)s selected seat", "%(n)s selected seats", n), {n: n}, true);
-            var positionsPart = interpolate(ngettext("%(n)s checked position", "%(n)s checked positions", checked.length), {n: checked.length}, true);
-            placeBtn.textContent = interpolate(gettext("Place %(seats)s on %(positions)s"), {seats: seatsPart, positions: positionsPart}, true);
-            placeBtn.disabled = n === 0 || checked.length === 0;
+        // Which of the two jobs the map is doing right now. The checkboxes in the
+        // position list already say which one staff mean: something checked is
+        // "these positions need seats", nothing checked is "I'm not placing
+        // anything". Deriving the mode from them rather than from a separate
+        // toggle means there's no third piece of state to get out of sync, and
+        // no guessing when a rectangle happens to cover both kinds of seat.
+        function isPlacingMode() {
+            return checkedCount() > 0;
         }
-        positionListEl.addEventListener("change", renderPlaceBtn);
+
+        function renderPlaceBtn() {
+            if (isPlacingMode()) {
+                var n = Object.keys(placementPool).length;
+                var checked = checkedCount();
+                var seatsPart = interpolate(ngettext("%(n)s selected seat", "%(n)s selected seats", n), {n: n}, true);
+                var positionsPart = interpolate(ngettext("%(n)s checked position", "%(n)s checked positions", checked), {n: checked}, true);
+                placeBtn.textContent = interpolate(gettext("Place %(seats)s on %(positions)s"), {seats: seatsPart, positions: positionsPart}, true);
+                placeBtn.className = "pos-btn-primary";
+                placeBtn.disabled = n === 0;
+            } else {
+                var r = Object.keys(removalPool).length;
+                placeBtn.textContent = r
+                    ? interpolate(ngettext("Clear %(n)s selected seat", "Clear %(n)s selected seats", r), {n: r}, true)
+                    : gettext("Select seats to clear");
+                placeBtn.className = "pos-btn-danger";
+                placeBtn.disabled = r === 0;
+            }
+        }
+
+        // Checking or unchecking a position can flip the mode, which would leave
+        // a selection staged for an action the button no longer offers - and an
+        // invisible one, since only the active mode's seats are picked from here
+        // on. Drop it rather than let it sit there waiting to surprise someone.
+        positionListEl.addEventListener("change", function () {
+            if (isPlacingMode()) {
+                removalPool = {};
+            } else {
+                placementPool = {};
+            }
+            render();
+            renderPlaceBtn();
+        });
 
         function svgPoint(evt) {
             var pt = svg.createSVGPoint();
@@ -2479,11 +2579,10 @@
         // straight to that order, instead of making staff go back to search
         // and type/remember its code - the two single clicks that make up the
         // double-click already no-op harmlessly for a seat like this (neither
-        // the free-seat pool toggle nor the own-seat unassign branch applies).
-        // Deliberately excludes this order's own seats - those already have a
-        // real, different action on a single click (unassign), so a double-
-        // click there just means "unassign, then reload the same order",
-        // which would be a confusing surprise rather than a shortcut.
+        // staged-selection branch applies to another order's seat).
+        // Deliberately excludes this order's own seats: double-clicking one
+        // would just reload the order that's already open, and its two single
+        // clicks have already staged and unstaged it, so nothing is lost.
         svg.addEventListener("dblclick", function (e) {
             var seat = seatAtEvent(e);
             if (!seat || seat.status === "free" || !seat.order_code) return;
@@ -2497,14 +2596,25 @@
             drag = null;
 
             if (!d.moved) {
-                // A plain click (no drag) on one of this order's own already-
-                // assigned seats removes it from that position - dragging it
-                // instead moves it (see the d.movePosition branch below).
+                // A plain click (no drag) on one of this order's own seats
+                // stages it for removal - dragging it instead moves it (see the
+                // d.movePosition branch below). Only in clearing mode: while
+                // positions are checked the map is placing seats, and a stray
+                // click on an already-seated one must not quietly queue it up
+                // for the opposite action.
                 if (d.movePosition) {
-                    unassignSeat(d.movePosition);
+                    if (!isPlacingMode()) {
+                        if (removalPool[d.clickSeat.guid]) {
+                            delete removalPool[d.clickSeat.guid];
+                        } else {
+                            removalPool[d.clickSeat.guid] = d.clickSeat;
+                        }
+                        render();
+                        renderPlaceBtn();
+                    }
                     return;
                 }
-                if (d.clickSeat && d.clickSeat.status === "free") {
+                if (d.clickSeat && d.clickSeat.status === "free" && isPlacingMode()) {
                     if (placementPool[d.clickSeat.guid]) {
                         delete placementPool[d.clickSeat.guid];
                     } else if (Object.keys(placementPool).length < checkedCount()) {
@@ -2515,14 +2625,14 @@
                     return;
                 }
                 // A plain click that didn't land on any seat at all - clears
-                // whatever's pending in the placement pool, so staff have an
-                // easy way out of a selection without having to click every
-                // pooled seat again individually. A *drag* starting from empty
-                // space is the rubber-band multi-select (the d.moved branch
-                // below) and is unaffected by this - only a non-dragging click
-                // clears.
-                if (!d.clickSeat && Object.keys(placementPool).length) {
+                // whatever's staged, so staff have an easy way out of a
+                // selection without having to click every seat again
+                // individually. A *drag* starting from empty space is the
+                // rubber-band multi-select (the d.moved branch below) and is
+                // unaffected by this - only a non-dragging click clears.
+                if (!d.clickSeat && (Object.keys(placementPool).length || Object.keys(removalPool).length)) {
                     placementPool = {};
+                    removalPool = {};
                     render();
                     renderPlaceBtn();
                 }
@@ -2557,13 +2667,26 @@
                 x0: Math.min(d.startPt.x, pt.x), x1: Math.max(d.startPt.x, pt.x),
                 y0: Math.min(d.startPt.y, pt.y), y1: Math.max(d.startPt.y, pt.y),
             };
+            // Same split as a single click: the rectangle only ever gathers the
+            // kind of seat the current mode acts on, so dragging across a row
+            // holding both free seats and this order's own can't produce a
+            // selection the button can't act on.
+            var placing = isPlacingMode();
             var cap = checkedCount();
             seats.forEach(function (s) {
-                if (s.status !== "free" || s.x == null || s.y == null) return;
+                if (s.x == null || s.y == null) return;
                 if (!(s.x >= rect.x0 && s.x <= rect.x1 && s.y >= rect.y0 && s.y <= rect.y1)) return;
-                if (placementPool[s.guid]) return;
-                if (Object.keys(placementPool).length >= cap) return;
-                placementPool[s.guid] = s;
+                if (placing) {
+                    if (s.status !== "free" || placementPool[s.guid]) return;
+                    if (Object.keys(placementPool).length >= cap) return;
+                    placementPool[s.guid] = s;
+                } else {
+                    // No cap when clearing: unlike placement, which can't outrun
+                    // the number of positions waiting for a seat, there's nothing
+                    // stopping staff clearing every seat the order holds.
+                    if (!isOwnSeat(s)) return;
+                    removalPool[s.guid] = s;
+                }
             });
             render();
             renderPlaceBtn();
@@ -2619,7 +2742,85 @@
             next();
         }
 
+        // Mirrors placeSeatsOneByOne(): the fallback for when the single batched
+        // commit is rejected, so staff still get a per-seat pass/fail report.
+        function clearSeatsOneByOne(positions) {
+            setMsg(msgEl, gettext("Clearing seats one by one - this is not a single atomic action, a failure partway through leaves earlier removals in place…"), null);
+            var i = 0, ok = 0, failed = [];
+            var n = positions.length;
+            function next() {
+                if (i >= n) {
+                    var resultMsg = interpolate(
+                        ngettext("Cleared %(ok)s/%(n)s seat.", "Cleared %(ok)s/%(n)s seats.", n),
+                        {ok: ok, n: n}, true
+                    );
+                    if (failed.length) {
+                        resultMsg += " " + interpolate(gettext("Failed: %(errors)s"), {errors: failed.join("; ")}, true);
+                    }
+                    setMsg(msgEl, resultMsg, failed.length ? "error" : "success");
+                    removalPool = {};
+                    renderPositionList(positionListEl);
+                    render();
+                    renderPlaceBtn();
+                    refreshPayButtonState();
+                    return;
+                }
+                var pos = positions[i];
+                i += 1;
+                api(eventPath("/orderpositions/" + pos.id + "/"), {
+                    method: "PATCH",
+                    body: JSON.stringify({seat: null}),
+                }).then(function (res) {
+                    if (res.ok) {
+                        ok += 1;
+                        applyPositionSeat(pos.id, null);
+                    } else {
+                        failed.push("#" + pos.id + ": " + describeError(res.data));
+                    }
+                    next();
+                });
+            }
+            next();
+        }
+
+        function clearSelectedSeats() {
+            var positions = Object.keys(removalPool)
+                .map(function (g) { return ownPositionOfSeat(removalPool[g]); })
+                .filter(Boolean);
+            var n = positions.length;
+            if (!n) return;
+            placeBtn.disabled = true;
+            setMsg(msgEl, interpolate(ngettext("Clearing %(n)s seat…", "Clearing %(n)s seats…", n), {n: n}, true), null);
+
+            api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
+                method: "POST",
+                body: JSON.stringify({
+                    send_email: false,
+                    patch_positions: positions.map(function (p) {
+                        return {position: p.id, body: {seat: null}};
+                    }),
+                }),
+            }).then(function (res) {
+                if (res.ok) {
+                    positions.forEach(function (p) { applyPositionSeat(p.id, null); });
+                    setMsg(msgEl, interpolate(ngettext("Cleared %(n)s seat.", "Cleared %(n)s seats.", n), {n: n}, true), "success");
+                    removalPool = {};
+                    renderPositionList(positionListEl);
+                    render();
+                    renderPlaceBtn();
+                    refreshPayButtonState();
+                } else {
+                    setMsg(msgEl, interpolate(gettext("Batch clearing failed (%(error)s) - retrying one by one…"), {error: describeError(res.data)}, true), "error");
+                    clearSeatsOneByOne(positions);
+                }
+            });
+        }
+
         placeBtn.addEventListener("click", function () {
+            if (!isPlacingMode()) {
+                clearSelectedSeats();
+                return;
+            }
             var poolSeats = Object.keys(placementPool).map(function (g) { return placementPool[g]; });
             var positionIds = Array.prototype.slice.call(positionListEl.querySelectorAll("input[type=checkbox]:checked"))
                 .map(function (cb) { return parseInt(cb.dataset.positionId, 10); });
@@ -2675,29 +2876,6 @@
                 applyPositionSeat(position.id, res.data.seat);
                 renderPositionList(positionListEl);
                 render();
-                refreshPayButtonState();
-            });
-        }
-
-        // A plain click on one of this order's own seats removes it - the
-        // OrderPositionChangeSerializer's `seat` field accepts null explicitly
-        // to unassign (confirmed in orderchange.py: it goes through
-        // OrderChangeManager.change_seat(position, None), same as a real move).
-        function unassignSeat(position) {
-            setMsg(msgEl, gettext("Removing seat…"), null);
-            api(eventPath("/orderpositions/" + position.id + "/"), {
-                method: "PATCH",
-                body: JSON.stringify({seat: null}),
-            }).then(function (res) {
-                if (!res.ok) {
-                    setMsg(msgEl, describeError(res.data), "error");
-                    return;
-                }
-                setMsg(msgEl, gettext("Seat removed."), "success");
-                applyPositionSeat(position.id, null);
-                renderPositionList(positionListEl);
-                render();
-                renderPlaceBtn();
                 refreshPayButtonState();
             });
         }

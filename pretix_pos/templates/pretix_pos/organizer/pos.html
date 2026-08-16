@@ -167,7 +167,12 @@
                 <div id="pos-tab-find" class="pos-tab-panel" hidden>
                     <div class="pos-columns">
                         <div class="pos-col pos-col-items">
-                            <h2>{% trans "Seating plan" %}</h2>
+                            {% comment %}
+                            The how-it-works text is set as this heading's tooltip
+                            from pos.js (setSeatmapHelp) - it's long, and as a
+                            paragraph it pushed the map itself off the screen.
+                            {% endcomment %}
+                            <h2 id="pos-order-seatmap-title" class="pos-has-help">{% trans "Seating plan" %}</h2>
                             <div id="pos-order-seatmap-wrap" class="pos-msg">{% trans "Select an order to place or move seats." %}</div>
                         </div>
                         <div class="pos-col pos-col-positions">

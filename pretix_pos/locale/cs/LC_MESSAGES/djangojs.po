@@ -474,3 +474,101 @@ msgstr "Snížit počet"
 #: static/pretix_pos/pos.js
 msgid "Increase quantity"
 msgstr "Zvýšit počet"
+
+#: static/pretix_pos/pos.js
+msgid ""
+"This order's own seats (for the date selected above) are shown in a muted "
+"highlight color. What clicking does depends on the checkboxes in the position "
+"list: with positions checked you are placing seats, so clicks and rectangle "
+"drags pick free seats; with nothing checked you are clearing seats, so they "
+"pick this order's own seats instead. Either way the selection is only staged "
+"- shown with a ring - until you press the button next to the legend, and "
+"clicking empty space clears it. Drag one of this order's own seats onto a "
+"free seat to move it (shown as a translucent preview while dragging); hold "
+"Ctrl while dragging to move its whole block of seats together. Hover any "
+"occupied seat to see which order holds it, or double-click it to jump "
+"straight to that order. Positions for other dates are listed above, greyed "
+"out - switch the date to work with them."
+msgstr ""
+"Vlastní místa této objednávky (pro termín vybraný výše) jsou zobrazena "
+"tlumenou zvýrazňující barvou. Co udělá kliknutí, závisí na zaškrtávátkách v "
+"seznamu pozic: když jsou pozice zaškrtnuté, usazujete, takže kliknutí i "
+"přetažení obdélníku vybírají volná místa; když není zaškrtnuté nic, rušíte, "
+"takže vybírají naopak vlastní místa této objednávky. Tak či tak je výběr "
+"zatím jen připravený – zobrazí se obrysem – dokud nestisknete tlačítko vedle "
+"legendy; kliknutím na prázdné místo výběr zrušíte. Přetažením některého z "
+"vlastních míst na volné místo ho přesunete (během přetahování se zobrazí "
+"poloprůhledný náhled); podržením klávesy Ctrl při přetahování přesunete celý "
+"blok míst najednou. Najetím myší na obsazené místo zjistíte, které "
+"objednávce patří, nebo na něj dvakrát klikněte a přejděte přímo na danou "
+"objednávku. Pozice pro ostatní termíny jsou uvedeny výše, zešedlé – pro "
+"práci s nimi přepněte termín."
+
+#: static/pretix_pos/pos.js
+msgid "free — shown in its own seating category's color"
+msgstr "volné – barvou příslušné kategorie sezení"
+
+#: static/pretix_pos/pos.js
+msgid "unavailable"
+msgstr "nedostupné"
+
+#: static/pretix_pos/pos.js
+msgid "this order's seats"
+msgstr "místa této objednávky"
+
+#: static/pretix_pos/pos.js
+msgid "selected to place"
+msgstr "vybráno k usazení"
+
+#: static/pretix_pos/pos.js
+msgid "selected to clear"
+msgstr "vybráno ke zrušení"
+
+#: static/pretix_pos/pos.js
+msgid "Select seats to clear"
+msgstr "Vyberte místa ke zrušení"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Clear %(n)s selected seat"
+msgid_plural "Clear %(n)s selected seats"
+msgstr[0] "Zrušit %(n)s vybrané místo"
+msgstr[1] "Zrušit %(n)s vybraná místa"
+msgstr[2] "Zrušit %(n)s vybraných míst"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Clearing %(n)s seat…"
+msgid_plural "Clearing %(n)s seats…"
+msgstr[0] "Ruší se %(n)s místo…"
+msgstr[1] "Ruší se %(n)s místa…"
+msgstr[2] "Ruší se %(n)s míst…"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Cleared %(n)s seat."
+msgid_plural "Cleared %(n)s seats."
+msgstr[0] "Zrušeno %(n)s místo."
+msgstr[1] "Zrušena %(n)s místa."
+msgstr[2] "Zrušeno %(n)s míst."
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Cleared %(ok)s/%(n)s seat."
+msgid_plural "Cleared %(ok)s/%(n)s seats."
+msgstr[0] "Zrušeno %(ok)s/%(n)s místo."
+msgstr[1] "Zrušeno %(ok)s/%(n)s místa."
+msgstr[2] "Zrušeno %(ok)s/%(n)s míst."
+
+#: static/pretix_pos/pos.js
+msgid ""
+"Clearing seats one by one - this is not a single atomic action, a failure "
+"partway through leaves earlier removals in place…"
+msgstr ""
+"Místa se ruší jedno po druhém – není to jedna nedělitelná akce, při selhání "
+"v půlce zůstanou dřívější zrušení provedená…"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Batch clearing failed (%(error)s) - retrying one by one…"
+msgstr "Hromadné zrušení selhalo (%(error)s) – zkouším jedno po druhém…"
