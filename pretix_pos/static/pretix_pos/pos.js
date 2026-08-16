@@ -1902,6 +1902,15 @@
         if (oldGuid && oldGuid !== (patchedSeat && patchedSeat.seat_guid)) {
             var oldSeat = orderSeats.find(function (s) { return s.guid === oldGuid; });
             if (oldSeat) oldSeat.status = "free";
+            // removalPool is keyed by seat guid, so this position moving (or
+            // being cleared) leaves any staging on its old seat pointing at a
+            // seat the order no longer holds: it would still paint with the red
+            // "selected to clear" ring and still be counted in the button, but
+            // resolve to no position when the button was pressed - promising to
+            // clear more seats than it then cleared. Dropping it here covers
+            // every path that can change a position's seat at once, single move
+            // and Ctrl+drag block move alike.
+            delete removalPool[oldGuid];
         }
         if (patchedSeat) {
             var newSeat = orderSeats.find(function (s) { return s.guid === patchedSeat.seat_guid; });
@@ -2876,6 +2885,9 @@
                 applyPositionSeat(position.id, res.data.seat);
                 renderPositionList(positionListEl);
                 render();
+                // The moved seat's guid changed, so applyPositionSeat() may have
+                // dropped it from removalPool - the button's count has to follow.
+                renderPlaceBtn();
                 refreshPayButtonState();
             });
         }
@@ -2956,6 +2968,7 @@
                         setMsg(msgEl, gettext("Block moved."), "success");
                         renderPositionList(positionListEl);
                         render();
+                        renderPlaceBtn();
                         refreshPayButtonState();
                         return;
                     }
@@ -3000,6 +3013,7 @@
                     setMsg(msgEl, gettext("Block moved."), "success");
                     renderPositionList(positionListEl);
                     render();
+                    renderPlaceBtn();
                     refreshPayButtonState();
                 } else {
                     setMsg(msgEl, interpolate(gettext("Batch move failed (%(error)s) - retrying one by one…"), {error: describeError(res.data)}, true), "error");
