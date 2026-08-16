@@ -626,3 +626,29 @@ msgid ""
 msgstr ""
 "K této platbě není QR kód – zkontrolujte, že je pro tuto akci nastavená "
 "platební metoda bankovním převodem."
+
+#: static/pretix_pos/pos.js
+msgid "Bank transfer"
+msgstr "Bankovní převod"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Paid %(amount)s by %(method)s on %(date)s"
+msgstr "Zaplaceno %(amount)s – %(method)s, %(date)s"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Valid until %(date)s"
+msgstr "Platí do %(date)s"
+
+#: static/pretix_pos/pos.js
+msgid "Extend to the event date"
+msgstr "Prodloužit do konání akce"
+
+#: static/pretix_pos/pos.js
+msgid "Extending…"
+msgstr "Prodlužuji…"
+
+#: static/pretix_pos/pos.js
+msgid "Can't tell which date this order is for."
+msgstr "Nelze zjistit, na který termín je objednávka."

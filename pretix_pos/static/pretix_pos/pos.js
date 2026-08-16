@@ -584,6 +584,9 @@
             }
             state.event.testmode = !!res.data.testmode;
             state.event.name = pickI18n(res.data.name);
+            // Needed by orderLastEventDate() for events without subevents,
+            // where no position carries a date of its own.
+            state.event.dateFrom = res.data.date_from || null;
             saveState();
             testmodeKnown = true;
             headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
@@ -1490,6 +1493,7 @@
     // next full reload.
     var orderHeaderEl = null;
     var orderTotalEl = null;
+    var orderPaymentsEl = null;
     var orderCreditEl = null;
     var orderListEl = null;
     var orderPayBlockEl = null;
@@ -1941,6 +1945,28 @@
             gettext(" — fully paid")
         );
 
+        // How the money actually came in. Staff regularly need this after the
+        // fact - to answer "did they pay me in cash?" at a shift handover, or
+        // to know what to hand back before recording a refund - and until now
+        // the terminal showed only whether an order was paid, never how.
+        orderPaymentsEl.innerHTML = "";
+        (order.payments || [])
+            .filter(function (p) { return p.state === "confirmed"; })
+            .forEach(function (p) {
+                var line = document.createElement("p");
+                line.className = "pos-paid-with";
+                line.textContent = interpolate(
+                    gettext("Paid %(amount)s by %(method)s on %(date)s"),
+                    {
+                        amount: fmtMoney(p.amount),
+                        method: paymentMethodLabel(p),
+                        date: p.payment_date ? new Date(p.payment_date).toLocaleString() : "?",
+                    },
+                    true
+                );
+                orderPaymentsEl.appendChild(line);
+            });
+
         // A canceled position (or a lower price after an edit) on an
         // already-paid order doesn't trigger any refund on its own - core
         // only auto-reacts to a *higher* total on a paid order (flips it back
@@ -2048,6 +2074,34 @@
                 orderPayBlockEl.appendChild(bankMsg);
             }
 
+            // An unpaid reservation expires on its own and releases the seats.
+            // For a "they'll pay at the door" booking taken over the phone,
+            // that's exactly what staff don't want, and the alternative was
+            // going into the backend to change the date by hand. pretix has no
+            // "never expires" - Order.expires can't be null - so the longest
+            // sensible life is the performance the order is for.
+            var expiryRow = document.createElement("div");
+            expiryRow.className = "pos-pay-row";
+            var expiryMsg = document.createElement("div");
+            expiryMsg.className = "pos-msg";
+
+            var expiryLabel = document.createElement("span");
+            expiryLabel.className = "pos-hint";
+            expiryLabel.textContent = order.expires
+                ? interpolate(gettext("Valid until %(date)s"), {date: new Date(order.expires).toLocaleDateString()}, true)
+                : "";
+            expiryRow.appendChild(expiryLabel);
+
+            var extendBtn = document.createElement("button");
+            extendBtn.type = "button";
+            extendBtn.className = "pos-btn-secondary";
+            extendBtn.textContent = gettext("Extend to the event date");
+            extendBtn.addEventListener("click", function () { extendOrder(order, extendBtn, expiryMsg); });
+            expiryRow.appendChild(extendBtn);
+
+            orderPayBlockEl.appendChild(expiryRow);
+            orderPayBlockEl.appendChild(expiryMsg);
+
             // Taking cash before every seatable position actually has a seat risks
             // collecting money for a seat that turns out not to exist -
             // orderIsSeated() is already used to sort/color the Edit order list,
@@ -2098,6 +2152,8 @@
         orderDetailEl.appendChild(orderHeaderEl);
         orderTotalEl = document.createElement("p");
         orderDetailEl.appendChild(orderTotalEl);
+        orderPaymentsEl = document.createElement("div");
+        orderDetailEl.appendChild(orderPaymentsEl);
         orderCreditEl = document.createElement("div");
         orderDetailEl.appendChild(orderCreditEl);
         orderPayBlockEl = document.createElement("div");
@@ -2226,6 +2282,60 @@
             orderSeatmapWrapEl.appendChild(buildSeatmapLegend());
 
             orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, placeMsg, orderListEl, seId);
+        });
+    }
+
+    // What to call a payment after the fact. Cash/card/QR taken here are all
+    // core "boxoffice" payments told apart by the payment_type this terminal
+    // writes into them, so the provider alone doesn't say much - fall back to
+    // it only for payments made somewhere other than a till.
+    function paymentMethodLabel(payment) {
+        if (payment.provider === BANK_TRANSFER_PROVIDER) return gettext("Bank transfer");
+        var type = (payment.details || {}).payment_type;
+        var known = PAYMENT_METHODS.find(function (m) { return m.value === type; });
+        return known ? known.label : payment.provider;
+    }
+
+    // The last date this order is actually for - an unpaid reservation should
+    // survive until the performance it's for, not expire days before it while
+    // the customer is still planning to pay at the door. Uses the latest date
+    // the order covers, so a multi-date order doesn't lose its later positions
+    // when its earliest one has been and gone.
+    function orderLastEventDate(order) {
+        var dates = (order.positions || [])
+            .filter(function (p) { return !p.canceled && p.subevent; })
+            .map(function (p) {
+                var se = subeventsList.find(function (s) { return String(s.id) === String(p.subevent); });
+                return se && se.date_from;
+            })
+            .filter(Boolean);
+        if (!dates.length && state.event && state.event.dateFrom) dates = [state.event.dateFrom];
+        if (!dates.length) return null;
+        return dates.sort()[dates.length - 1];
+    }
+
+    function extendOrder(order, btn, msg) {
+        var date = orderLastEventDate(order);
+        if (!date) {
+            setMsg(msg, gettext("Can't tell which date this order is for."), "error");
+            return;
+        }
+        btn.disabled = true;
+        setMsg(msg, gettext("Extending…"), null);
+        // The endpoint takes a plain date and expires the order at the end of
+        // that day in the event's timezone, so an order stays valid throughout
+        // the day of the performance.
+        api(eventPath("/orders/" + order.code + "/extend/"), {
+            method: "POST",
+            body: JSON.stringify({expires: date.slice(0, 10)}),
+        }).then(function (res) {
+            if (!res.ok) {
+                btn.disabled = false;
+                setMsg(msg, describeError(res.data), "error");
+                return;
+            }
+            loadOrderDetail(order.code);
+            doSearch();
         });
     }
 

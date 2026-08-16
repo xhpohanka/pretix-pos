@@ -622,3 +622,10 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
 .pos-overlay-box button {
     margin-top: 16px;
 }
+
+/* One line per confirmed payment under the order total. */
+.pos-paid-with {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #2e7d32;
+}
