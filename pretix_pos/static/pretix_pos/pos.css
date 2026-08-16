@@ -511,15 +511,11 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     margin-bottom: 10px;
 }
 
-/* Takes the leftover width and wraps within itself, so the button stays on the
-   bar's own line instead of being pushed underneath it. */
 .pos-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 4px 14px;
-    flex: 1 1 200px;
-    min-width: 0;
-    margin: 0;
+    margin: 10px 0 0;
     padding: 0;
     list-style: none;
     font-size: 12px;
@@ -528,6 +524,15 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
 
 .pos-seatmap-bar > button {
     flex: 0 0 auto;
+}
+
+/* Takes the leftover width so the button stays hard right whether or not
+   there's a message to show, and drops .pos-msg's own top margin, which would
+   otherwise push it out of line with the button. */
+.pos-seatmap-bar > .pos-msg {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-top: 0;
 }
 
 .pos-legend li {

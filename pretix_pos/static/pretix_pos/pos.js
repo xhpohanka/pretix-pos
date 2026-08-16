@@ -2140,30 +2140,37 @@
                 return;
             }
 
-            // The full how-it-works text used to sit here as a paragraph, which
-            // on a busy order pushed the map (and the action button under it)
-            // well down the screen for something staff read once. It's now the
-            // heading's tooltip, with a colour legend in its place - the same
-            // trade the eshop picker already makes.
+            // The full how-it-works text used to sit above the map as a
+            // paragraph, which on a busy order pushed the map itself well down
+            // the screen for something staff read once. It's the heading's
+            // tooltip now.
             setSeatmapHelp();
 
+            // Everything that needs to be seen while working goes above the
+            // map: the action button, and the result of the last action
+            // ("Block moved.", "Cleared 3 seats.", any error). Both used to sit
+            // under a 16-row plan, i.e. off-screen exactly when they mattered -
+            // an error especially, which staff could miss entirely.
             var bar = document.createElement("div");
             bar.className = "pos-seatmap-bar";
-            bar.appendChild(buildSeatmapLegend());
+            bar.appendChild(placeMsg);
 
             var placeBtn = document.createElement("button");
             placeBtn.type = "button";
             placeBtn.className = "pos-btn-primary";
-            orderSeatmapWrapEl.appendChild(bar);
-            // Sits in the bar next to the legend rather than under the map:
-            // below a 16-row plan it was off-screen exactly when it was needed.
             bar.appendChild(placeBtn);
+            orderSeatmapWrapEl.appendChild(bar);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
             svg.id = "pos-svg-order";
             svg.setAttribute("class", "pos-seatmap");
             orderSeatmapWrapEl.appendChild(svg);
-            orderSeatmapWrapEl.appendChild(placeMsg);
+
+            // Below the map, deliberately: a POS terminal is worked by someone
+            // who already knows what the colours mean, so the legend is there
+            // to look up on the rare occasion it's needed, not to occupy the
+            // space above the map every day.
+            orderSeatmapWrapEl.appendChild(buildSeatmapLegend());
 
             orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, placeMsg, orderListEl, seId);
         });
