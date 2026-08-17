@@ -36,6 +36,11 @@
     var subeventsList = []; // raw API results, ordered - used by the Quick reservation tab
     var subeventSeatedItems = {}; // subeventId -> {itemId: true} - items with a seat category mapping on that date
     var quotasBySubevent = {}; // subeventId (or "null" for an event without subevents) -> [{items, variations, available}]
+    // Unlike sellSeats (which is deliberately just the currently selected
+    // date's drawable map), availability is needed for every row in Quick
+    // reservation. Keep those maps separated by date so one date can never be
+    // counted using another date's seats.
+    var seatmapsBySubevent = {}; // subeventId (or "null") -> drawable seats
 
     function loadState() {
         try {
@@ -550,16 +555,23 @@
         // load or from "Change event".
         cart = [];
         activeSeatItem = null;
+        sellSeats = [];
+        seatmapsBySubevent = {};
         renderCart();
 
         Promise.all([loadEventInfo(), loadItemsIndex(), loadQuotas()]).then(function () {
             if (state.event.hasSubevents) {
                 subeventBar.hidden = false;
-                loadSubevents().then(loadQuickReservationTab);
+                loadSubevents().then(function () {
+                    return loadForCurrentContext().then(function () {
+                        loadQuickReservationTab();
+                    });
+                });
             } else {
                 subeventBar.hidden = true;
-                loadForCurrentContext();
-                loadQuickReservationTab();
+                return loadForCurrentContext().then(function () {
+                    loadQuickReservationTab();
+                });
             }
         });
     }
@@ -652,6 +664,23 @@
         }
         // For non-seated items, use quota availability
         var key = subeventId != null ? String(subeventId) : "null";
+        var seats = seatmapsBySubevent[key];
+        if (seats) {
+            // For dates with subevents the category mapping remains
+            // authoritative even when every seat is blocked/occupied (or Seat
+            // rows have not been generated yet). Without subevents, infer it
+            // from the seatmap as before because there is no subevent mapping.
+            var seatedItems = subeventId != null ? (subeventSeatedItems[subeventId] || {}) : null;
+            var hasSeats = seatedItems ? !!seatedItems[itemId] : seats.some(function (s) {
+                return s.product_id === itemId;
+            });
+            if (hasSeats) {
+                return seats.filter(function (s) {
+                    return s.product_id === itemId && s.status === "free";
+                }).length;
+            }
+        }
+        // For non-seated items, or if no seatmap could be loaded, use quota availability.
         var quotas = (quotasBySubevent[key] || []).filter(function (q) {
             return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
         });
@@ -709,7 +738,6 @@
                 });
                 subeventSeatedItems[se.id] = seatedItems;
             });
-            loadForCurrentContext();
         });
     }
 
@@ -748,7 +776,7 @@
 
     function loadForCurrentContext() {
         activeSeatItem = null;
-        loadSellItems();
+        return loadSellItems();
     }
 
     // --------------------------------------------------------------- sell tab
@@ -771,22 +799,37 @@
             sellItemsEl.textContent = gettext("Choose a date above.");
             sellItems = [];
             sellSeats = [];
-            return;
+            return Promise.resolve();
         }
-        loadQuotas().then(function () {
-            loadSellItemsWithQuotas();
+        return loadQuotas().then(function () {
+            return loadSellItemsWithQuotas();
+        });
+    }
+
+    function loadSeatmap(subeventId) {
+        var key = subeventId != null ? String(subeventId) : "null";
+        if (!window.PretixSeatingRenderer) {
+            delete seatmapsBySubevent[key];
+            return Promise.resolve([]);
+        }
+        var path = subeventId != null
+            ? eventPath("/subevents/" + subeventId + "/seatmap/")
+            : eventPath("/seatmap/");
+        return apiAllPages(path).then(function (res) {
+            if (!res.ok) {
+                delete seatmapsBySubevent[key];
+                return [];
+            }
+            var seats = ((res.data && res.data.results) || []).map(toDrawSeat);
+            seatmapsBySubevent[key] = seats;
+            return seats;
         });
     }
 
     function loadSellItemsWithQuotas() {
         var seId = currentSubeventId();
-        var seatsPromise = window.PretixSeatingRenderer
-            ? apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
-            : Promise.resolve({ok: true, data: {results: []}});
-
-        seatsPromise.then(function (seatsRes) {
-            var raw = (seatsRes.ok && seatsRes.data && seatsRes.data.results) || [];
-            sellSeats = raw.map(toDrawSeat);
+        return loadSeatmap(seId).then(function (seats) {
+            sellSeats = seats;
             var itemList = Object.keys(itemsById).map(function (id) { return itemsById[id]; })
                 .filter(function (it) { return it.active; })
                 .sort(function (a, b) { return (a.position || 0) - (b.position || 0); });
@@ -1248,6 +1291,16 @@
     }
 
     function loadQuickReservationTab() {
+        var rows = state.event.hasSubevents ? subeventsList : [null];
+        var seatmapLoads = rows.filter(function (se) {
+            return !se || subeventSeatingPlans[se.id];
+        }).map(function (se) {
+            return loadSeatmap(se ? se.id : null);
+        });
+        return Promise.all(seatmapLoads).then(renderQuickReservationTab);
+    }
+
+    function renderQuickReservationTab() {
         quickTableEl.innerHTML = "";
         var units = quickOrderableUnits();
         if (!units.length) {
