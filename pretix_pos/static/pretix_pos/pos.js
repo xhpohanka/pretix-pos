@@ -14,6 +14,9 @@
     var itemsById = {};
     var sellItems = [];
     var sellSeats = [];
+    // Whether the folded "products with no seats in this plan" list is open.
+    // Kept outside the render so it survives the rebuild every seat click does.
+    var sellExtrasOpen = false;
     var cart = [];
     // null = the seat map places whatever each seat's own category maps to, which
     // is the only correct answer and therefore the default. Set to
@@ -916,9 +919,57 @@
             sellItemsEl.textContent = gettext("No items available.");
             return;
         }
-        sellItems.forEach(function (item) {
+        var seated = sellItems.filter(function (it) { return it.needsSeat; });
+        var others = sellItems.filter(function (it) { return !it.needsSeat; });
+
+        // On a date the plan actually maps, the products it *doesn't* map are the
+        // rare case - staff sell them a few times a season - and listing them
+        // costs the vertical space the seat map wants. They fold away into one
+        // line instead. A date with no mapped products at all is a different
+        // story: those products are then the only thing to sell, so nothing is
+        // folded.
+        if (!seated.length) {
+            sellItems.forEach(function (item) {
+                sellItemsEl.appendChild(renderSellItemRow(item));
+            });
+            renderSeatpick();
+            return;
+        }
+
+        seated.forEach(function (item) {
             sellItemsEl.appendChild(renderSellItemRow(item));
         });
+
+        if (others.length) {
+            var seId = currentSubeventId();
+            var inUse = others.some(function (it) {
+                if (seatOverride && seatOverride.itemId === it.id) return true;
+                return cart.some(function (c) { return c.itemId === it.id && c.subeventId === seId; });
+            });
+
+            var det = document.createElement("details");
+            det.className = "pos-extras";
+            // Forced open while one of them is actually being used - the list is
+            // rebuilt on every click, and snapping shut under staff mid-sale
+            // would be worse than the space it saves.
+            det.open = sellExtrasOpen || inUse;
+            var sum = document.createElement("summary");
+            sum.textContent = interpolate(
+                ngettext(
+                    "%(count)s product with no seats in this plan",
+                    "%(count)s products with no seats in this plan",
+                    others.length
+                ),
+                {count: others.length}, true
+            );
+            det.appendChild(sum);
+            det.addEventListener("toggle", function () { sellExtrasOpen = det.open; });
+            others.forEach(function (item) {
+                det.appendChild(renderSellItemRow(item));
+            });
+            sellItemsEl.appendChild(det);
+        }
+
         renderSeatpick();
     }
 

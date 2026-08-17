@@ -1,5 +1,11 @@
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute is only a UA-stylesheet `display: none`, so any author
+   rule that sets `display` on the same element beats it - which silently showed
+   an empty box for every hidden element this file gives a display to. Everything
+   here toggles visibility through `hidden`, so make it win outright. */
+[hidden] { display: none !important; }
+
 body {
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
@@ -669,4 +675,19 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     border: 1px solid #f0ad4e;
     border-radius: 6px;
     font-weight: 600;
+}
+
+/* Folded list of products the plan doesn't map. One line when shut, so the seat
+   map keeps the vertical space it needs. */
+.pos-extras > summary {
+    cursor: pointer;
+    padding: 10px 0;
+    color: #555;
+    font-size: 13px;
+    border-bottom: 1px solid #eee;
+}
+
+.pos-extras[open] > summary {
+    font-weight: 600;
+    color: #222;
 }
