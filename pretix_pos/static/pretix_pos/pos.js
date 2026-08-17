@@ -705,6 +705,15 @@
                 // Neither constraint alone is the number that can be sold.
                 return Math.min(freeSeats, quotaAvailable);
             }
+            // An unmapped product can be seated on any category, but it still
+            // cannot be sold past the physical capacity of this plan. Quick
+            // reservation leaves the exact seat unassigned for later; that
+            // does not make another ticket-sized slot appear in the venue.
+            var plan = subeventId != null ? !!subeventSeatingPlans[subeventId] : seats.length > 0;
+            if (plan) {
+                var allFreeSeats = seats.filter(function (s) { return s.status === "free"; }).length;
+                return Math.min(allFreeSeats, quotaAvailable);
+            }
         }
         // For non-seated items, or if no seatmap could be loaded, use quota availability.
         return quotaAvailable;
@@ -1165,6 +1174,8 @@
     function adjustQty(itemId, variationId, price, delta) {
         var seId = currentSubeventId();
         if (delta > 0) {
+            var already = cartCountFor(itemId, variationId);
+            if (already >= getAvailableCount(seId, itemId, variationId)) return;
             cart.push({itemId: itemId, variationId: variationId, seatGuid: null, price: price, subeventId: seId});
         } else {
             var idx = cart.findIndex(function (c) {
@@ -1594,8 +1605,9 @@
             units.forEach(function (u) {
                 var td = document.createElement("td");
                 var disabledMap = subeventDisabled[seId] || {items: {}, variations: {}};
+                var availableCount = getAvailableCount(seId, u.itemId, u.variationId);
                 var disabled = (u.variationId ? disabledMap.variations[u.variationId] : disabledMap.items[u.itemId]) ||
-                    !isAvailableAt(seId, u.itemId, u.variationId);
+                    !isAvailableAt(seId, u.itemId, u.variationId) || availableCount <= 0;
                 if (disabled) {
                     td.className = "pos-quick-cell-disabled";
                     td.textContent = "—";
@@ -1605,6 +1617,7 @@
                     input.min = "0";
                     input.value = "0";
                     input.className = "pos-quick-qty";
+                    input.max = availableCount;
                     input.dataset.itemId = u.itemId;
                     if (u.variationId) input.dataset.variationId = u.variationId;
                     if (seId != null) input.dataset.subeventId = seId;
@@ -1660,6 +1673,12 @@
         var next = (parseInt(input.value, 10) || 0) + step;
         input.value = Math.max(min, input.max ? Math.min(parseInt(input.max, 10), next) : next);
         input.dispatchEvent(new Event("change", {bubbles: true}));
+    });
+
+    quickTableEl.addEventListener("change", function (e) {
+        if (!e.target.classList.contains("pos-quick-qty")) return;
+        var max = parseInt(e.target.max, 10);
+        if (!isNaN(max)) e.target.value = Math.max(0, Math.min(max, parseInt(e.target.value, 10) || 0));
     });
 
     function buildQuickPositions() {
