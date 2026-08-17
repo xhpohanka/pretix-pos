@@ -2,6 +2,8 @@ from django.test import TestCase
 from django_scopes import scopes_disabled
 from pretix.base.models import Organizer
 
+from pretix_pos.channels import POSSalesChannelType
+
 
 class POSAppViewTest(TestCase):
     @scopes_disabled()
@@ -36,6 +38,9 @@ class POSAppViewTest(TestCase):
         self.client.get(f"/{self.organizer.slug}/pos/")
         self.client.get(f"/{self.organizer.slug}/pos/")
         self.assertEqual(self.organizer.sales_channels.filter(identifier="pretix_pos").count(), 1)
+
+    def test_pos_sales_channel_supports_payment_restrictions(self):
+        self.assertTrue(POSSalesChannelType().payment_restrictions_supported)
 
     def test_404s_when_plugin_not_enabled(self):
         self.organizer.plugins = ""
