@@ -1472,6 +1472,7 @@
         var body = {status: mode === "sell" ? "p" : "n", positions: positions, testmode: !!state.event.testmode};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
+        if (mode === "reserve") body.send_email = !!email;
         if (mode === "sell") {
             body.payment_provider = "boxoffice";
             // Tagged onto the same immediate boxoffice payment core already
@@ -1817,6 +1818,7 @@
         var body = {status: "n", positions: positions, testmode: !!state.event.testmode};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
+        body.send_email = !!email;
         createQuickOrder(body, positions).then(function (result) {
             quickBtnReserve.disabled = false;
             if (result.error) {
@@ -3009,7 +3011,7 @@
         function submitCreate(positions) {
             return api(changePath, {
             method: "POST",
-                body: JSON.stringify({create_positions: positions, send_email: false}),
+                body: JSON.stringify({create_positions: positions, send_email: !!order.email}),
             });
         }
         submitCreate(createPositions).then(function (res) {
@@ -3511,7 +3513,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: false,
+                    send_email: !!currentOrder.email,
                     patch_positions: positions.map(function (p) {
                         return {position: p.id, body: {seat: null}};
                     }),
@@ -3549,7 +3551,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: false,
+                    send_email: !!currentOrder.email,
                     patch_positions: positionIds.slice(0, n).map(function (posId, idx) {
                         return {position: posId, body: {seat: poolSeats[idx].guid}};
                     }),
@@ -3705,7 +3707,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: false,
+                    send_email: !!currentOrder.email,
                     patch_positions: moves.map(function (m) {
                         return {position: m.position.id, body: {seat: m.targetGuid}};
                     }),
