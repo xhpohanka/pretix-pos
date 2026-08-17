@@ -2965,7 +2965,13 @@
         var order = currentOrder;
         btn.disabled = true;
         setMsg(msg, gettext("Canceling…"), null);
-        api(eventPath("/orderpositions/" + pos.id + "/"), {method: "DELETE"}).then(function (res) {
+        api(eventPath("/orders/" + encodeURIComponent(order.code) + "/change/"), {
+            method: "POST",
+            body: JSON.stringify({
+                send_email: !!order.email,
+                cancel_positions: [{position: pos.id}],
+            }),
+        }).then(function (res) {
             if (!res.ok) {
                 btn.disabled = false;
                 setMsg(msg, describeError(res.data), "error");
@@ -3513,7 +3519,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: !!currentOrder.email,
+                    send_email: false,
                     patch_positions: positions.map(function (p) {
                         return {position: p.id, body: {seat: null}};
                     }),
@@ -3551,7 +3557,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: !!currentOrder.email,
+                    send_email: false,
                     patch_positions: positionIds.slice(0, n).map(function (posId, idx) {
                         return {position: posId, body: {seat: poolSeats[idx].guid}};
                     }),
@@ -3707,7 +3713,7 @@
             api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/change/"), {
                 method: "POST",
                 body: JSON.stringify({
-                    send_email: !!currentOrder.email,
+                    send_email: false,
                     patch_positions: moves.map(function (m) {
                         return {position: m.position.id, body: {seat: m.targetGuid}};
                     }),
