@@ -1400,7 +1400,7 @@
     // refused a seat at order-create time outright, but change_seat() checks no
     // mapping at all, so those positions are created seatless and seated
     // immediately afterwards - the same shape Quick reservation and
-    // addPositionToOrder() already use to get past this check.
+    // addPositionsToOrder() already uses to get past this check.
     function splitCartForSubmit(positions) {
         var deferred = [];
         positions.forEach(function (p, idx) {
@@ -2100,7 +2100,7 @@
 
     // One <select> + "+" button, appending one new (unseated-for-now)
     // position for subeventId (null for an event without subevents) via
-    // addPositionToOrder() - reused for every group header below and for the
+    // addPositionsToOrder() - reused for every group header below and for the
     // no-subevents case. Only lists items not disabled for that date (same
     // source as the Quick reservation table); renders nothing if there's
     // nothing addable there.
@@ -2110,7 +2110,8 @@
         var disabledMap = subeventDisabled[subeventId] || {items: {}, variations: {}};
         var available = quickOrderableUnits().filter(function (u) {
             var disabled = u.variationId ? disabledMap.variations[u.variationId] : disabledMap.items[u.itemId];
-            return !disabled && isAvailableAt(subeventId, u.itemId, u.variationId);
+            return !disabled && isAvailableAt(subeventId, u.itemId, u.variationId) &&
+                getAvailableCount(subeventId, u.itemId, u.variationId) > 0;
         });
         if (!available.length) return wrap;
 
@@ -2132,8 +2133,8 @@
         function onOutsideClick(ev) {
             if (popup && !popup.contains(ev.target) && ev.target !== addBtn) closePopup();
         }
-        function doAdd(u) {
-            addPositionToOrder(subeventId, u.itemId, u.variationId, addBtn, addMsg);
+        function doAdd(u, count) {
+            addPositionsToOrder(subeventId, u.itemId, u.variationId, count || 1, addBtn, addMsg);
         }
 
         // Only one real choice for this date - add it straight away, nothing
@@ -2142,20 +2143,43 @@
         // the way until it's actually needed.
         addBtn.addEventListener("click", function () {
             if (popup) { closePopup(); return; }
-            if (available.length === 1) { doAdd(available[0]); return; }
             popup = document.createElement("div");
             popup.className = "pos-add-popup";
+            var select = document.createElement("select");
             available.forEach(function (u) {
-                var opt = document.createElement("button");
-                opt.type = "button";
+                var opt = document.createElement("option");
+                opt.value = available.indexOf(u);
                 opt.textContent = u.label;
-                opt.addEventListener("click", function () {
-                    closePopup();
-                    doAdd(u);
-                });
-                popup.appendChild(opt);
+                select.appendChild(opt);
             });
-            wrap.appendChild(popup);
+            var quantity = document.createElement("input");
+            quantity.type = "number";
+            quantity.min = "1";
+            quantity.value = "1";
+            quantity.className = "pos-add-quantity";
+            function refreshQuantityLimit() {
+                var selected = available[parseInt(select.value, 10) || 0];
+                var max = getAvailableCount(subeventId, selected.itemId, selected.variationId);
+                quantity.max = Math.max(1, max);
+                if (parseInt(quantity.value, 10) > max) quantity.value = String(Math.max(1, max));
+            }
+            select.addEventListener("change", refreshQuantityLimit);
+            refreshQuantityLimit();
+            var confirm = document.createElement("button");
+            confirm.type = "button";
+            confirm.className = "pos-btn-primary";
+            confirm.textContent = gettext("Add");
+            confirm.addEventListener("click", function () {
+                var count = Math.max(1, parseInt(quantity.value, 10) || 1);
+                closePopup();
+                doAdd(available[parseInt(select.value, 10) || 0], count);
+            });
+            popup.appendChild(select);
+            popup.appendChild(quantity);
+            popup.appendChild(confirm);
+            popup.style.top = (addBtn.getBoundingClientRect().bottom + 4) + "px";
+            popup.style.left = addBtn.getBoundingClientRect().left + "px";
+            document.body.appendChild(popup);
             document.addEventListener("click", onOutsideClick, true);
         });
         wrap.appendChild(addBtn);
@@ -2950,7 +2974,8 @@
         });
     }
 
-    // Adds one new position to an existing order. Tries a plain, seatless
+    // Adds several new positions to an existing order in one change operation.
+    // Tries a plain, seatless
     // POST first - that's all most dates need (either unseated, or a
     // manually-assigned date where a seat gets picked afterwards through the
     // seatmap below, same as any other not-yet-seated position). Only a date
@@ -2966,46 +2991,62 @@
     // release itself fails, the position just keeps that seat and shows up
     // seated in the list above - staff can unassign it from the seatmap
     // below like any other misplaced seat, no separate recovery path needed.
-    function addPositionToOrder(subeventId, itemId, variationId, btn, msg) {
+    function addPositionsToOrder(subeventId, itemId, variationId, count, btn, msg) {
         var order = currentOrder;
-        var body = {order: order.code, item: itemId};
-        if (variationId) body.variation = variationId;
-        if (subeventId != null) body.subevent = subeventId;
-
-        function attempt(seatGuid) {
-            var payload = seatGuid ? Object.assign({}, body, {seat: seatGuid}) : body;
-            return api(eventPath("/orderpositions/"), {method: "POST", body: JSON.stringify(payload)});
+        var createPositions = [];
+        for (var i = 0; i < count; i++) {
+            var p = {item: itemId};
+            if (variationId) p.variation = variationId;
+            if (subeventId != null) p.subevent = subeventId;
+            createPositions.push(p);
         }
 
         btn.disabled = true;
         setMsg(msg, gettext("Adding…"), null);
 
-        attempt(null).then(function (res) {
-            if (res.ok) return {position: res.data};
-            if (!(res.data && res.data.seat)) return {error: describeError(res.data)};
-            var p = {item: itemId};
-            if (variationId) p.variation = variationId;
-            if (subeventId != null) p.subevent = subeventId;
-            return assignQuickSeats([p]).then(function (enough) {
-                if (!enough || !p.seat) {
-                    return {error: gettext("No free seats left for this item/date.")};
-                }
-                return attempt(p.seat).then(function (res2) {
-                    if (!res2.ok) return {error: describeError(res2.data)};
-                    return releaseQuickSeats([res2.data]).then(function (allReleased) {
-                        return {position: res2.data, releaseFailed: !allReleased};
-                    });
-                });
+        var changePath = eventPath("/orders/" + encodeURIComponent(order.code) + "/change/");
+        var beforeIds = (order.positions || []).map(function (p) { return p.id; });
+        function submitCreate(positions) {
+            return api(changePath, {
+            method: "POST",
+                body: JSON.stringify({create_positions: positions, send_email: false}),
             });
-        }).then(function (result) {
-            if (result.error) {
+        }
+        submitCreate(createPositions).then(function (res) {
+            if (!res.ok) {
+                // Seat-required dates return a structured `seat` validation
+                // error. Reserve temporary free seats for the whole batch,
+                // retry once, then release those placeholders together.
+                if (res.data && res.data.seat) {
+                    return assignQuickSeats(createPositions).then(function (enough) {
+                        if (!enough) {
+                            btn.disabled = false;
+                            setMsg(msg, gettext("No free seats left for this item/date."), "error");
+                            return;
+                        }
+                        return submitCreate(createPositions).then(function (res2) {
+                            if (!res2.ok) {
+                                btn.disabled = false;
+                                setMsg(msg, describeError(res2.data), "error");
+                                return;
+                            }
+                            var added = (res2.data.positions || []).filter(function (p) {
+                                return beforeIds.indexOf(p.id) === -1;
+                            });
+                            return releaseQuickSeats(added).then(function (released) {
+                                btn.disabled = false;
+                                setMsg(msg, released ? gettext("Positions added.") : gettext("Positions added, but some temporary seats could not be released."), released ? "success" : "error");
+                                refreshOrderAfterEdit();
+                                doSearch();
+                            });
+                        });
+                    });
+                }
                 btn.disabled = false;
-                setMsg(msg, result.error, "error");
+                setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            // refreshOrderAfterEdit() restages the position list (including
-            // this button/message), so there's nothing further to reset here
-            // even when releaseFailed - the restaged seat badge already shows it.
+            btn.disabled = false;
             refreshOrderAfterEdit();
             doSearch();
         });

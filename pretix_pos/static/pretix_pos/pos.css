@@ -388,9 +388,7 @@ button.pos-btn-add-position {
 }
 
 .pos-add-popup {
-    position: absolute;
-    top: 100%;
-    left: 0;
+    position: fixed;
     z-index: 20;
     margin-top: 4px;
     background: #fff;
@@ -401,6 +399,19 @@ button.pos-btn-add-position {
     flex-direction: column;
     min-width: 220px;
     overflow: hidden;
+    padding: 8px;
+    gap: 6px;
+}
+
+.pos-add-popup select,
+.pos-add-popup input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 6px;
+}
+
+.pos-add-popup button.pos-btn-primary {
+    width: 100%;
 }
 
 .pos-add-popup button {
