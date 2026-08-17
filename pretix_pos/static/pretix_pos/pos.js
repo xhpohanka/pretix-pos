@@ -13,7 +13,6 @@
     var state = loadState();
     var itemsById = {};
     var sellItems = [];
-    var sellUnavailable = []; // unmapped products this date can't sell, with the reason
     var sellSeats = [];
     // Whether the folded "products with no seats in this plan" list is open.
     // Kept outside the render so it survives the rebuild every seat click does.
@@ -671,16 +670,6 @@
         return quotas.every(function (q) { return q.available; });
     }
 
-    // isAvailableAt() collapses "no quota exists for this date" and "the quota is
-    // sold out" into one false. The difference matters when explaining why a
-    // product can't be sold: the first is a setup step someone still has to do
-    // in the backend, the second is just today's reality.
-    function quotaStateFor(subeventId, itemId, variationId) {
-        var quotas = quotasFor(subeventId, itemId, variationId);
-        if (!quotas.length) return "noquota";
-        return quotas.every(function (q) { return q.available; }) ? "ok" : "soldout";
-    }
-
     function getAvailableCount(subeventId, itemId, variationId) {
         // For seated items, return available seats from the seatmap, not the quota count
         var hasSeats = sellSeats && sellSeats.some(function (s) { return s.product_id === itemId; });
@@ -832,7 +821,6 @@
         if (state.event.hasSubevents && !subeventSelect.value) {
             sellItemsEl.textContent = gettext("Choose a date above.");
             sellItems = [];
-            sellUnavailable = [];
             sellSeats = [];
             return Promise.resolve();
         }
@@ -888,29 +876,7 @@
                     variations: variations.map(function (v) {
                         return {id: v.id, value: pickI18n(v.value), price: priceFor(it.id, v.id, seId)};
                     }),
-                    // Before the availability filter above - needed to tell a
-                    // product with no quota at all from one that's sold out.
-                    allVariations: (it.variations || []).filter(function (v) { return v.active; }),
                     needsSeat: needsSeat,
-                };
-            });
-            // Products the plan doesn't map and that can't be sold on this date
-            // either. They used to be dropped silently, which left staff looking
-            // for a product that simply wasn't there and nothing saying why - see
-            // renderSellItems(), which lists them in the folded section with the
-            // reason instead. Still kept out of sellItems so nothing that acts on
-            // that list can put one in a cart.
-            sellUnavailable = sellItems.filter(function (item) {
-                if (item.needsSeat) return false;
-                return item.hasVariations ? !item.variations.length : quotaStateFor(seId, item.id, null) !== "ok";
-            }).map(function (item) {
-                return {
-                    name: item.name,
-                    price: item.price,
-                    reason: item.hasVariations
-                        ? (item.allVariations.every(function (v) { return quotaStateFor(seId, item.id, v.id) === "noquota"; })
-                            ? "noquota" : "soldout")
-                        : quotaStateFor(seId, item.id, null),
                 };
             });
             sellItems = sellItems.filter(function (item) {
@@ -987,7 +953,7 @@
             sellItemsEl.appendChild(renderSellItemRow(item));
         });
 
-        if (others.length || sellUnavailable.length) {
+        if (others.length) {
             var seId = currentSubeventId();
             var inUse = others.some(function (it) {
                 if (seatOverride && seatOverride.itemId === it.id) return true;
@@ -1001,36 +967,18 @@
             // would be worse than the space it saves.
             det.open = sellExtrasOpen || inUse;
             var sum = document.createElement("summary");
-            var total = others.length + sellUnavailable.length;
             sum.textContent = interpolate(
                 ngettext(
                     "%(count)s product with no seats in this plan",
                     "%(count)s products with no seats in this plan",
-                    total
+                    others.length
                 ),
-                {count: total}, true
+                {count: others.length}, true
             );
             det.appendChild(sum);
             det.addEventListener("toggle", function () { sellExtrasOpen = det.open; });
             others.forEach(function (item) {
                 det.appendChild(renderSellItemRow(item));
-            });
-            // Listed but not offered: naming the product and the reason beats
-            // omitting it, which reads as "this terminal can't sell that" when
-            // the truth is a quota nobody has set up for this date yet.
-            sellUnavailable.forEach(function (item) {
-                var row = document.createElement("div");
-                row.className = "pos-item-row pos-item-unavailable";
-                var name = document.createElement("span");
-                name.textContent = item.name + " (" + fmtMoney(item.price) + ")";
-                row.appendChild(name);
-                var why = document.createElement("span");
-                why.className = "pos-item-price";
-                why.textContent = item.reason === "noquota"
-                    ? gettext("no quota for this date - add one in the backend")
-                    : gettext("sold out");
-                row.appendChild(why);
-                det.appendChild(row);
             });
             sellItemsEl.appendChild(det);
         }

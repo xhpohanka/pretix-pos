@@ -738,11 +738,3 @@ msgid_plural "%(count)s products with no seats in this plan"
 msgstr[0] "%(count)s produkt bez míst v tomto plánu"
 msgstr[1] "%(count)s produkty bez míst v tomto plánu"
 msgstr[2] "%(count)s produktů bez míst v tomto plánu"
-
-#: static/pretix_pos/pos.js
-msgid "no quota for this date - add one in the backend"
-msgstr "na tento termín nemá kvótu – přidejte ji v administraci"
-
-#: static/pretix_pos/pos.js
-msgid "sold out"
-msgstr "vyprodáno"
