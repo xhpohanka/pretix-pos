@@ -136,9 +136,11 @@
                             <div id="pos-items" class="pos-msg">{% trans "Loading…" %}</div>
 
                             <div id="pos-seatpick-wrap" hidden>
-                                <h3 id="pos-seatpick-title"></h3>
-                                <p class="pos-hint">{% trans "Click free (green) seats to add them to the cart. Click a selected seat again to remove it." %}</p>
+                                <h3 id="pos-seatpick-title">{% trans "Seating plan" %}</h3>
+                                <p class="pos-hint">{% blocktrans %}Click a free seat to add the product its own seating category is mapped to; click it again to remove it. To sell something else on a seat - a product with variants, or one this plan doesn't map at all - press "Seat this product" next to it first.{% endblocktrans %}</p>
+                                <div id="pos-seat-override" class="pos-seat-override" hidden></div>
                                 <svg id="pos-svg-sell" class="pos-seatmap"></svg>
+                                <div id="pos-seatpick-msg" class="pos-msg"></div>
                             </div>
                         </div>
                         <div class="pos-col pos-col-cart">

@@ -653,3 +653,20 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     color: #666;
     font-size: 12px;
 }
+
+/* Shown only while a seat click ignores the plan's mapping. Deliberately loud:
+   this is a state staff opt into, and forgetting it is on would quietly sell
+   the wrong product on every seat they click next. */
+.pos-seat-override {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: #fff3e0;
+    border: 1px solid #f0ad4e;
+    border-radius: 6px;
+    font-weight: 600;
+}

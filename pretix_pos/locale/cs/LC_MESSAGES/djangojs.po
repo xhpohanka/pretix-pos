@@ -661,3 +661,72 @@ msgstr "Propadlo %(date)s – místa už nejsou držena"
 #: static/pretix_pos/pos.js
 msgid "Revive until the event date"
 msgstr "Obnovit do konání akce"
+
+#: static/pretix_pos/pos.js
+msgid "Seat this product"
+msgstr "Usadit tento produkt"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Seat this product (%(count)s)"
+msgstr "Usadit tento produkt (%(count)s)"
+
+#: static/pretix_pos/pos.js
+msgid "Placing this — click seats"
+msgstr "Usazuji tento — klikejte do mapy"
+
+#: static/pretix_pos/pos.js
+msgid "Click its seats on the map"
+msgstr "Klikejte na jeho místa v mapě"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "%(name)s — seated, pick a variant"
+msgstr "%(name)s — se sezením, vyberte variantu"
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Placing: %(name)s - the seating plan's own mapping is ignored"
+msgstr "Usazuji: %(name)s – mapování plánu se ignoruje"
+
+#: static/pretix_pos/pos.js
+msgid "Back to the mapping"
+msgstr "Zpět na mapování"
+
+#: static/pretix_pos/pos.js
+msgid ""
+"This seat's category has no product mapped to it - choose a product with "
+"“Seat this product” first."
+msgstr ""
+"Kategorie tohoto místa nemá namapovanou žádnou položku – zvolte nejdřív "
+"produkt tlačítkem „Usadit tento produkt“."
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid ""
+"%(name)s has variants, so a seat can't tell which one - pick the variant with "
+"“Seat this product” first."
+msgstr ""
+"%(name)s má varianty, takže z místa nelze poznat kterou – vyberte nejdřív "
+"variantu tlačítkem „Usadit tento produkt“."
+
+#: static/pretix_pos/pos.js
+msgid "This seat can't be booked from here."
+msgstr "Toto místo odsud nelze obsadit."
+
+#: static/pretix_pos/pos.js
+msgid ""
+"Could not match every seat to its position - assign the missing ones in the "
+"Edit order tab."
+msgstr ""
+"Nepodařilo se přiřadit každé místo k jeho pozici – zbytek přiřaďte v záložce "
+"Upravit objednávku."
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid ""
+"The order was created, but %(count)s seat(s) could not be assigned "
+"(%(error)s) - finish it in the Edit order tab."
+msgstr ""
+"Objednávka byla vytvořena, ale %(count)s míst se nepodařilo přiřadit "
+"(%(error)s) – dokončete to v záložce Upravit objednávku."

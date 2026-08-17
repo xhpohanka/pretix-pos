@@ -271,3 +271,15 @@ msgstr "Vyberte objednávku pro zobrazení jejích pozic."
 #: templates/pretix_pos/organizer/pos.html:184
 msgid "This date only"
 msgstr "Jen tento termín"
+
+#: templates/pretix_pos/organizer/pos.html:140
+msgid ""
+"Click a free seat to add the product its own seating category is mapped to; "
+"click it again to remove it. To sell something else on a seat - a product "
+"with variants, or one this plan doesn't map at all - press \"Seat this "
+"product\" next to it first."
+msgstr ""
+"Kliknutím na volné místo přidáte položku, na kterou je namapovaná jeho "
+"kategorie sezení; opětovným kliknutím ji odeberete. Chcete-li na místo "
+"prodat něco jiného – produkt s variantami nebo takový, který plán vůbec "
+"nemapuje – stiskněte nejdřív „Usadit tento produkt“ u něj."

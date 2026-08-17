@@ -15,7 +15,14 @@
     var sellItems = [];
     var sellSeats = [];
     var cart = [];
-    var activeSeatItem = null;
+    // null = the seat map places whatever each seat's own category maps to, which
+    // is the only correct answer and therefore the default. Set to
+    // {itemId, variationId} when staff deliberately override that to sell some
+    // other product on a seat - the one case where the mapping can't decide,
+    // either because the seat's category maps to nothing, because the mapped
+    // product has variations, or because they simply want a different product
+    // there. Always visible as a banner above the map while set.
+    var seatOverride = null;
     var currentOrder = null;
     var placementPool = {}; // seat_guid -> seat, pending bulk placement on the loaded order
     // seat_guid -> seat, this order's own seats staged for bulk removal. Removing
@@ -554,7 +561,7 @@
         // place a genuinely fresh session starts, whether from initial page
         // load or from "Change event".
         cart = [];
-        activeSeatItem = null;
+        seatOverride = null;
         sellSeats = [];
         seatmapsBySubevent = {};
         renderCart();
@@ -748,7 +755,7 @@
         // subeventId (see adjustQty/renderSeatpick), so buildPositions() below
         // still submits everything to the right date regardless of which date
         // is currently selected.
-        activeSeatItem = null;
+        seatOverride = null;
         loadForCurrentContext();
 
         // An order loaded in "Find order" has its own seatmap tied to
@@ -775,7 +782,7 @@
     });
 
     function loadForCurrentContext() {
-        activeSeatItem = null;
+        seatOverride = null;
         return loadSellItems();
     }
 
@@ -783,8 +790,9 @@
 
     var sellItemsEl = document.getElementById("pos-items");
     var seatpickWrap = document.getElementById("pos-seatpick-wrap");
-    var seatpickTitle = document.getElementById("pos-seatpick-title");
     var svgSell = document.getElementById("pos-svg-sell");
+    var seatOverrideEl = document.getElementById("pos-seat-override");
+    var seatpickMsg = document.getElementById("pos-seatpick-msg");
     var cartEl = document.getElementById("pos-cart");
     var emailInput = document.getElementById("pos-email");
     var nameInput = document.getElementById("pos-name");
@@ -859,15 +867,9 @@
                 if (item.needsSeat) return true;
                 return item.hasVariations ? item.variations.length > 0 : isAvailableAt(seId, item.id, null);
             });
-            // Auto-open seat picking for the first seated item instead of
-            // requiring an extra "Pick seats" click first - there's nothing to
-            // disambiguate for the common case of one seated item, and even
-            // with several, showing the map right away (defaulting to the
-            // first) is still one click less than before.
-            if (activeSeatItem == null || !sellItems.some(function (it) { return it.id === activeSeatItem && it.needsSeat; })) {
-                var firstSeated = sellItems.find(function (it) { return it.needsSeat; });
-                activeSeatItem = firstSeated ? firstSeated.id : null;
-            }
+            // Nothing to pre-select any more: the map is shown whenever this
+            // date has seats at all, and which product a click books is decided
+            // by the seat itself (see seatTargetFor()).
             renderSellItems();
         });
     }
@@ -931,47 +933,73 @@
         }).length;
     }
 
+    // How many seats are already in the cart for this exact product on this date.
+    function seatCountFor(itemId, variationId) {
+        var seId = currentSubeventId();
+        return cart.filter(function (c) {
+            return c.itemId === itemId && c.variationId === (variationId || null) &&
+                c.seatGuid && c.subeventId === seId;
+        }).length;
+    }
+
+    // The button that turns the mapping off and books this exact product on
+    // whatever seat is clicked next. Offered on every sellable product, mapped
+    // or not: "seat anything" is the whole point, and a single button per
+    // product is a smaller thing to explain than one rule for mapped products
+    // and another for the rest.
+    function seatOverrideButton(item, variation) {
+        var variationId = variation ? variation.id : null;
+        var active = seatOverride && seatOverride.itemId === item.id &&
+            (seatOverride.variationId || null) === variationId;
+        var count = seatCountFor(item.id, variationId);
+
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = active ? "pos-btn-secondary" : "";
+        btn.textContent = active
+            ? gettext("Placing this — click seats")
+            : (count
+                ? interpolate(gettext("Seat this product (%(count)s)"), {count: count}, true)
+                : gettext("Seat this product"));
+        btn.addEventListener("click", function () {
+            // Pressing the active one again goes back to following the mapping,
+            // so the override is never a state staff can only leave via the
+            // banner.
+            seatOverride = active ? null : {itemId: item.id, variationId: variationId};
+            setMsg(seatpickMsg, "", null);
+            renderSellItems();
+        });
+        return btn;
+    }
+
     function renderSellItemRow(item) {
         var row = document.createElement("div");
         row.className = "pos-item-row";
+        var seId = currentSubeventId();
 
-        if (item.needsSeat) {
+        // A product the mapping covers is sold by the seat, never by quantity -
+        // core refuses a seatless position for it on a date where seats are
+        // chosen, so a quantity stepper here would only build an order the API
+        // would reject.
+        if (item.needsSeat && !item.hasVariations) {
             var label = document.createElement("div");
             label.className = "pos-item-title";
             label.textContent = interpolate(gettext("%(name)s (%(price)s) — seated"), {name: item.name, price: fmtMoney(item.price)}, true);
             row.appendChild(label);
 
-            var seId = currentSubeventId();
             var availSpan = document.createElement("span");
             availSpan.className = "pos-item-available";
             availSpan.textContent = getAvailableCount(seId, item.id, null);
             row.appendChild(availSpan);
 
-            var seatCount = cart.filter(function (c) { return c.itemId === item.id && c.seatGuid && c.subeventId === seId; }).length;
-            if (activeSeatItem === item.id) {
-                // The map below is already showing this item's seats - nothing
-                // to click here, just a status readout.
-                var status = document.createElement("span");
-                status.className = "pos-item-price";
-                status.textContent = seatCount
-                    ? interpolate(ngettext("%(count)s selected", "%(count)s selected", seatCount), {count: seatCount}, true)
-                    : gettext("Pick seats below");
-                row.appendChild(status);
-            } else {
-                // Only reachable when more than one seated item exists - the map
-                // auto-opens for the first one, this just lets staff switch which
-                // item a click on the (shared) seatmap adds to.
-                var btn = document.createElement("button");
-                btn.type = "button";
-                btn.textContent = seatCount
-                    ? interpolate(gettext("Switch to this item (%(count)s)"), {count: seatCount}, true)
-                    : gettext("Switch to this item");
-                btn.addEventListener("click", function () {
-                    activeSeatItem = item.id;
-                    renderSellItems();
-                });
-                row.appendChild(btn);
-            }
+            var seated = seatCountFor(item.id, null);
+            var status = document.createElement("span");
+            status.className = "pos-item-price";
+            status.textContent = seated
+                ? interpolate(ngettext("%(count)s selected", "%(count)s selected", seated), {count: seated}, true)
+                : gettext("Click its seats on the map");
+            row.appendChild(status);
+            row.appendChild(seatOverrideButton(item, null));
             return row;
         }
 
@@ -980,17 +1008,40 @@
             wrap.style.width = "100%";
             var title = document.createElement("div");
             title.className = "pos-item-title";
-            title.textContent = item.name;
+            title.textContent = item.needsSeat
+                ? interpolate(gettext("%(name)s — seated, pick a variant"), {name: item.name}, true)
+                : item.name;
             wrap.appendChild(title);
-            var seId = currentSubeventId();
             item.variations.forEach(function (v) {
-                var varRow = qtyRow(v.value + " (" + fmtMoney(v.price) + ")", cartCountFor(item.id, v.id), function (delta) {
-                    adjustQty(item.id, v.id, v.price, delta);
-                });
-                var availSpan = document.createElement("span");
-                availSpan.className = "pos-item-available";
-                availSpan.textContent = getAvailableCount(seId, item.id, v.id);
-                varRow.appendChild(availSpan);
+                var varRow;
+                if (item.needsSeat) {
+                    // Mapped *and* has variations: the mapping says which product
+                    // but not which variant, so a seat click can't resolve it on
+                    // its own - these are placed through the override only. (This
+                    // is also what used to silently queue a position with no
+                    // variation at all, which the order API rejects.)
+                    varRow = document.createElement("div");
+                    varRow.className = "pos-item-row";
+                    var vlabel = document.createElement("span");
+                    vlabel.textContent = v.value + " (" + fmtMoney(v.price) + ")";
+                    varRow.appendChild(vlabel);
+                    var vcount = seatCountFor(item.id, v.id);
+                    if (vcount) {
+                        var vstatus = document.createElement("span");
+                        vstatus.className = "pos-item-price";
+                        vstatus.textContent = interpolate(ngettext("%(count)s selected", "%(count)s selected", vcount), {count: vcount}, true);
+                        varRow.appendChild(vstatus);
+                    }
+                } else {
+                    varRow = qtyRow(v.value + " (" + fmtMoney(v.price) + ")", cartCountFor(item.id, v.id), function (delta) {
+                        adjustQty(item.id, v.id, v.price, delta);
+                    });
+                    var availSpanV = document.createElement("span");
+                    availSpanV.className = "pos-item-available";
+                    availSpanV.textContent = getAvailableCount(seId, item.id, v.id);
+                    varRow.appendChild(availSpanV);
+                }
+                if (sellSeats.length) varRow.appendChild(seatOverrideButton(item, v));
                 wrap.appendChild(varRow);
             });
             row.appendChild(wrap);
@@ -1002,15 +1053,18 @@
         title2.textContent = item.name + " (" + fmtMoney(item.price) + ")";
         row.appendChild(title2);
 
-        var seId = currentSubeventId();
-        var availSpan = document.createElement("span");
-        availSpan.className = "pos-item-available";
-        availSpan.textContent = getAvailableCount(seId, item.id, null);
-        row.appendChild(availSpan);
+        var availSpan2 = document.createElement("span");
+        availSpan2.className = "pos-item-available";
+        availSpan2.textContent = getAvailableCount(seId, item.id, null);
+        row.appendChild(availSpan2);
 
         row.appendChild(qtyControls(cartCountFor(item.id, null), function (delta) {
             adjustQty(item.id, null, item.price, delta);
         }));
+        // An unmapped product can still be given a seat - core only refuses that
+        // at order-create time, and submitOrder() assigns those seats in a
+        // follow-up /change/ instead (see splitCartForSubmit()).
+        if (sellSeats.length) row.appendChild(seatOverrideButton(item, null));
         return row;
     }
 
@@ -1060,13 +1114,67 @@
         });
     }
 
+    // What a click on this seat should book, or null when nothing can be
+    // resolved without staff saying so. The override wins when set; otherwise
+    // the seat's own category decides, which is the only answer that can't be
+    // wrong.
+    function seatTargetFor(seat) {
+        if (seatOverride) return seatOverride;
+        if (seat.product_id == null) return null;
+        var item = itemsById[seat.product_id];
+        if (!item) return null;
+        // Mapped to a product with variations: the category says which product,
+        // not which variant, so this needs the override to be unambiguous.
+        if (item.has_variations) return null;
+        return {itemId: seat.product_id, variationId: null};
+    }
+
+    function seatRefusalMessage(seat) {
+        if (seat.product_id == null) {
+            return gettext("This seat's category has no product mapped to it - choose a product with \u201cSeat this product\u201d first.");
+        }
+        var item = itemsById[seat.product_id];
+        if (item && item.has_variations) {
+            return interpolate(
+                gettext("%(name)s has variants, so a seat can't tell which one - pick the variant with \u201cSeat this product\u201d first."),
+                {name: pickI18n(item.name)}, true
+            );
+        }
+        return gettext("This seat can't be booked from here.");
+    }
+
+    function renderOverrideBanner() {
+        seatOverrideEl.innerHTML = "";
+        seatOverrideEl.hidden = !seatOverride;
+        if (!seatOverride) return;
+        var item = itemsById[seatOverride.itemId];
+        var name = item ? pickI18n(item.name) : "#" + seatOverride.itemId;
+        if (seatOverride.variationId && item) {
+            var v = (item.variations || []).find(function (x) { return x.id === seatOverride.variationId; });
+            if (v) name += " – " + pickI18n(v.value);
+        }
+        var text = document.createElement("span");
+        text.textContent = interpolate(gettext("Placing: %(name)s - the seating plan's own mapping is ignored"), {name: name}, true);
+        seatOverrideEl.appendChild(text);
+
+        var cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = gettext("Back to the mapping");
+        cancel.addEventListener("click", function () {
+            seatOverride = null;
+            setMsg(seatpickMsg, "", null);
+            renderSellItems();
+        });
+        seatOverrideEl.appendChild(cancel);
+    }
+
     function renderSeatpick() {
-        if (activeSeatItem == null || !window.PretixSeatingRenderer || !itemsById[activeSeatItem]) {
+        if (!sellSeats.length || !window.PretixSeatingRenderer) {
             seatpickWrap.hidden = true;
             return;
         }
         seatpickWrap.hidden = false;
-        seatpickTitle.textContent = interpolate(gettext("Seats for: %(name)s"), {name: pickI18n(itemsById[activeSeatItem].name)}, true);
+        renderOverrideBanner();
         var seId = currentSubeventId();
         // Same ring-only, no-fill treatment as pretix_seatmap's eshop picker for
         // "in cart, not yet submitted" - a solid fixed color could collide with
@@ -1087,13 +1195,22 @@
             var idx = cart.findIndex(function (c) { return c.seatGuid === s.guid && c.subeventId === seId; });
             if (idx >= 0) {
                 cart.splice(idx, 1);
+                setMsg(seatpickMsg, "", null);
             } else {
                 if (s.status !== "free") return;
-                if (s.product_id != null && s.product_id !== activeSeatItem) return;
+                var target = seatTargetFor(s);
+                if (!target) {
+                    // Saying why beats a dead seat: without this the click just
+                    // does nothing and there's no way to guess what's missing.
+                    setMsg(seatpickMsg, seatRefusalMessage(s), "error");
+                    return;
+                }
+                setMsg(seatpickMsg, "", null);
                 var label = [s.zone, s.row_label, s.seat_label].filter(Boolean).join(" / ") || s.guid;
                 cart.push({
-                    itemId: activeSeatItem, variationId: null, seatGuid: s.guid,
-                    price: priceFor(activeSeatItem, null, seId), seatLabel: label, subeventId: seId,
+                    itemId: target.itemId, variationId: target.variationId || null, seatGuid: s.guid,
+                    price: priceFor(target.itemId, target.variationId || null, seId),
+                    seatLabel: label, subeventId: seId,
                 });
             }
             renderSellItems();
@@ -1186,6 +1303,64 @@
         });
     }
 
+    // Whether the order-create endpoint will accept a seat for this product on
+    // this date at all. It doesn't check *which* category the seat belongs to,
+    // only that the product has some mapping for the date (see
+    // OrderCreateSerializer) - so an overridden seat is fine as long as the
+    // product is mapped somewhere on the plan.
+    function createAcceptsSeat(itemId, subeventId) {
+        // A date's own seat_category_mapping (see loadSubevents) is the
+        // authoritative answer where there is one. An event without subevents has
+        // no subevent to carry it, so there the cached seatmap for that date is
+        // the only statement of which products the plan covers.
+        if (subeventId != null && subeventSeatedItems[subeventId]) {
+            return !!subeventSeatedItems[subeventId][itemId];
+        }
+        var seats = seatmapsBySubevent[subeventId != null ? String(subeventId) : "null"];
+        return !!(seats && seats.some(function (s) { return s.product_id === itemId; }));
+    }
+
+    // Splits what the cart asks for into what one POST /orders/ can do and what
+    // has to follow in a /change/ call. A product the plan maps nowhere is
+    // refused a seat at order-create time outright, but change_seat() checks no
+    // mapping at all, so those positions are created seatless and seated
+    // immediately afterwards - the same shape Quick reservation and
+    // addPositionToOrder() already use to get past this check.
+    function splitCartForSubmit(positions) {
+        var deferred = [];
+        positions.forEach(function (p, idx) {
+            if (!p.seat) return;
+            if (createAcceptsSeat(p.item, p.subevent == null ? null : p.subevent)) return;
+            deferred.push({index: idx, seat: p.seat});
+            delete p.seat;
+        });
+        return deferred;
+    }
+
+    // Assigns the seats that couldn't ride along on the order itself, in a
+    // single batched commit. Positions come back in the order they were
+    // submitted, which is what lets a deferred line find its own position.
+    function seatDeferredPositions(order, deferred) {
+        var created = order.positions || [];
+        var patches = deferred
+            .filter(function (d) { return created[d.index]; })
+            .map(function (d) { return {position: created[d.index].id, body: {seat: d.seat}}; });
+        if (patches.length !== deferred.length) {
+            return Promise.resolve(gettext("Could not match every seat to its position - assign the missing ones in the Edit order tab."));
+        }
+        return api(eventPath("/orders/" + encodeURIComponent(order.code) + "/change/"), {
+            method: "POST",
+            body: JSON.stringify({send_email: false, patch_positions: patches}),
+        }).then(function (res) {
+            if (res.ok) return null;
+            return interpolate(
+                gettext("The order was created, but %(count)s seat(s) could not be assigned (%(error)s) - finish it in the Edit order tab."),
+                {count: patches.length, error: describeError(res.data)},
+                true
+            );
+        });
+    }
+
     function submitOrder(mode) {
         var positions = buildPositions();
         if (!positions.length) return;
@@ -1216,6 +1391,9 @@
         btnReserve.disabled = true;
         btnSell.disabled = true;
         setMsg(sellMsg, gettext("Submitting…"), null);
+        // Strips the seats the create endpoint would refuse and remembers them
+        // for the follow-up call below.
+        var deferredSeats = splitCartForSubmit(positions);
         var body = {status: mode === "sell" ? "p" : "n", positions: positions, testmode: !!state.event.testmode};
         if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
         if (email) body.email = email;
@@ -1242,10 +1420,18 @@
             var doneMsg = mode === "sell"
                 ? interpolate(gettext("Sold — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true)
                 : interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true);
-            setMsg(sellMsg, doneMsg, "success");
+            var seatingDone = deferredSeats.length
+                ? seatDeferredPositions(res.data, deferredSeats)
+                : Promise.resolve(null);
+            seatingDone.then(function (problem) {
+                // The order exists either way - a seat that couldn't be placed
+                // is a leftover to finish in Edit order, not a failed sale, and
+                // saying so beats a bare success message that hides it.
+                setMsg(sellMsg, problem ? doneMsg + " " + problem : doneMsg, problem ? "error" : "success");
+            });
             if (mode === "sell") addToTill(method, res.data.total);
             cart = [];
-            activeSeatItem = null;
+            seatOverride = null;
             emailInput.value = "";
             nameInput.value = "";
             renderCart();
