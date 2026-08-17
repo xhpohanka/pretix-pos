@@ -641,6 +641,15 @@
         return quotas.every(function (q) { return q.available; });
     }
 
+    function getAvailableCount(subeventId, itemId, variationId) {
+        var key = subeventId != null ? String(subeventId) : "null";
+        var quotas = (quotasBySubevent[key] || []).filter(function (q) {
+            return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
+        });
+        if (!quotas.length) return 0;
+        return Math.min.apply(null, quotas.map(function (q) { return q.available_number; }));
+    }
+
     function loadSubevents() {
         subeventSelect.innerHTML = "";
         return api(eventPath("/subevents/?active=true&ordering=date_from")).then(function (res) {
@@ -875,6 +884,11 @@
             row.appendChild(label);
 
             var seId = currentSubeventId();
+            var availSpan = document.createElement("span");
+            availSpan.className = "pos-item-available";
+            availSpan.textContent = getAvailableCount(seId, item.id, null);
+            row.appendChild(availSpan);
+
             var seatCount = cart.filter(function (c) { return c.itemId === item.id && c.seatGuid && c.subeventId === seId; }).length;
             if (activeSeatItem === item.id) {
                 // The map below is already showing this item's seats - nothing
@@ -910,10 +924,16 @@
             title.className = "pos-item-title";
             title.textContent = item.name;
             wrap.appendChild(title);
+            var seId = currentSubeventId();
             item.variations.forEach(function (v) {
-                wrap.appendChild(qtyRow(v.value + " (" + fmtMoney(v.price) + ")", cartCountFor(item.id, v.id), function (delta) {
+                var varRow = qtyRow(v.value + " (" + fmtMoney(v.price) + ")", cartCountFor(item.id, v.id), function (delta) {
                     adjustQty(item.id, v.id, v.price, delta);
-                }));
+                });
+                var availSpan = document.createElement("span");
+                availSpan.className = "pos-item-available";
+                availSpan.textContent = getAvailableCount(seId, item.id, v.id);
+                varRow.appendChild(availSpan);
+                wrap.appendChild(varRow);
             });
             row.appendChild(wrap);
             return row;
@@ -923,6 +943,13 @@
         title2.className = "pos-item-title";
         title2.textContent = item.name + " (" + fmtMoney(item.price) + ")";
         row.appendChild(title2);
+
+        var seId = currentSubeventId();
+        var availSpan = document.createElement("span");
+        availSpan.className = "pos-item-available";
+        availSpan.textContent = getAvailableCount(seId, item.id, null);
+        row.appendChild(availSpan);
+
         row.appendChild(qtyControls(cartCountFor(item.id, null), function (delta) {
             adjustQty(item.id, null, item.price, delta);
         }));
@@ -1266,6 +1293,11 @@
                     price.className = "pos-quick-price";
                     price.textContent = fmtMoney(priceFor(u.itemId, u.variationId, seId));
                     td.appendChild(price);
+                    var avail = document.createElement("span");
+                    avail.className = "pos-quick-available";
+                    var availCount = getAvailableCount(seId, u.itemId, u.variationId);
+                    avail.textContent = "(" + availCount + ")";
+                    td.appendChild(avail);
                 }
                 tr.appendChild(td);
             });

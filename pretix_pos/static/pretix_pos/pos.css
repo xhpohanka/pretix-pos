@@ -642,3 +642,14 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     color: #c62828;
     font-weight: 600;
 }
+
+.pos-item-available {
+    color: #666;
+    font-size: 12px;
+}
+
+.pos-quick-available {
+    margin-left: 6px;
+    color: #666;
+    font-size: 12px;
+}
