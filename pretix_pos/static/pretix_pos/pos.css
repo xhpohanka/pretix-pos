@@ -629,3 +629,16 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     font-size: 13px;
     color: #2e7d32;
 }
+
+.pos-expiry {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: #555;
+}
+
+/* An order whose hold has already lapsed is not a detail - the seats staff are
+   about to promise someone may already be gone. */
+.pos-expiry-past {
+    color: #c62828;
+    font-weight: 600;
+}

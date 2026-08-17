@@ -1493,6 +1493,7 @@
     // next full reload.
     var orderHeaderEl = null;
     var orderTotalEl = null;
+    var orderExpiryEl = null;
     var orderPaymentsEl = null;
     var orderCreditEl = null;
     var orderListEl = null;
@@ -1945,6 +1946,24 @@
             gettext(" — fully paid")
         );
 
+        // When an unpaid reservation runs out. It belongs in the summary rather
+        // than only next to the button that changes it: it decides whether the
+        // customer on the phone still has their seats, so staff need to see it
+        // while reading the order, not only when they're already fixing it.
+        // Meaningless once an order is paid or canceled - core keeps the date on
+        // the row either way, but nothing acts on it anymore.
+        orderExpiryEl.innerHTML = "";
+        if (order.expires && (order.status === "n" || order.status === "e")) {
+            var expiry = new Date(order.expires);
+            var expired = order.status === "e" || expiry < new Date();
+            var line = document.createElement("p");
+            line.className = "pos-expiry" + (expired ? " pos-expiry-past" : "");
+            line.textContent = expired
+                ? interpolate(gettext("Expired %(date)s - the seats are no longer held"), {date: expiry.toLocaleString()}, true)
+                : interpolate(gettext("Valid until %(date)s"), {date: expiry.toLocaleString()}, true);
+            orderExpiryEl.appendChild(line);
+        }
+
         // How the money actually came in. Staff regularly need this after the
         // fact - to answer "did they pay me in cash?" at a shift handover, or
         // to know what to hand back before recording a refund - and until now
@@ -2003,6 +2022,7 @@
         payBtn = null;
         payMethodSelect = null;
         seatHintEl = null;
+
         if (order.status === "n") {
             // Method and button belong together on one line - the select is a
             // full-width block by default, which pushed the button onto a line
@@ -2074,34 +2094,6 @@
                 orderPayBlockEl.appendChild(bankMsg);
             }
 
-            // An unpaid reservation expires on its own and releases the seats.
-            // For a "they'll pay at the door" booking taken over the phone,
-            // that's exactly what staff don't want, and the alternative was
-            // going into the backend to change the date by hand. pretix has no
-            // "never expires" - Order.expires can't be null - so the longest
-            // sensible life is the performance the order is for.
-            var expiryRow = document.createElement("div");
-            expiryRow.className = "pos-pay-row";
-            var expiryMsg = document.createElement("div");
-            expiryMsg.className = "pos-msg";
-
-            var expiryLabel = document.createElement("span");
-            expiryLabel.className = "pos-hint";
-            expiryLabel.textContent = order.expires
-                ? interpolate(gettext("Valid until %(date)s"), {date: new Date(order.expires).toLocaleDateString()}, true)
-                : "";
-            expiryRow.appendChild(expiryLabel);
-
-            var extendBtn = document.createElement("button");
-            extendBtn.type = "button";
-            extendBtn.className = "pos-btn-secondary";
-            extendBtn.textContent = gettext("Extend to the event date");
-            extendBtn.addEventListener("click", function () { extendOrder(order, extendBtn, expiryMsg); });
-            expiryRow.appendChild(extendBtn);
-
-            orderPayBlockEl.appendChild(expiryRow);
-            orderPayBlockEl.appendChild(expiryMsg);
-
             // Taking cash before every seatable position actually has a seat risks
             // collecting money for a seat that turns out not to exist -
             // orderIsSeated() is already used to sort/color the Edit order list,
@@ -2109,6 +2101,33 @@
             // Also re-run after every seat placement/move/removal - see
             // refreshPayButtonState().
             refreshPayButtonState();
+        }
+
+        // An unpaid reservation expires on its own and releases the seats. For a
+        // "they'll pay at the door" booking taken over the phone that's exactly
+        // what staff don't want, and the alternative was editing the date by
+        // hand in the backend. Offered for an already-expired order too, not
+        // just one still running: extend_order() re-checks the quota and puts it
+        // back to pending, which is the only way to revive one from here.
+        // pretix has no "never expires" - Order.expires can't be null - so the
+        // performance the order is for is as long as it can live.
+        if (order.status === "n" || order.status === "e") {
+            var expiryRow = document.createElement("div");
+            expiryRow.className = "pos-pay-row";
+            var expiryMsg = document.createElement("div");
+            expiryMsg.className = "pos-msg";
+
+            var extendBtn = document.createElement("button");
+            extendBtn.type = "button";
+            extendBtn.className = "pos-btn-secondary";
+            extendBtn.textContent = order.status === "e"
+                ? gettext("Revive until the event date")
+                : gettext("Extend to the event date");
+            extendBtn.addEventListener("click", function () { extendOrder(order, extendBtn, expiryMsg); });
+            expiryRow.appendChild(extendBtn);
+
+            orderPayBlockEl.appendChild(expiryRow);
+            orderPayBlockEl.appendChild(expiryMsg);
         }
 
         orderCancelBlockEl.innerHTML = "";
@@ -2152,6 +2171,8 @@
         orderDetailEl.appendChild(orderHeaderEl);
         orderTotalEl = document.createElement("p");
         orderDetailEl.appendChild(orderTotalEl);
+        orderExpiryEl = document.createElement("div");
+        orderDetailEl.appendChild(orderExpiryEl);
         orderPaymentsEl = document.createElement("div");
         orderDetailEl.appendChild(orderPaymentsEl);
         orderCreditEl = document.createElement("div");

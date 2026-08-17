@@ -652,3 +652,12 @@ msgstr "Prodlužuji…"
 #: static/pretix_pos/pos.js
 msgid "Can't tell which date this order is for."
 msgstr "Nelze zjistit, na který termín je objednávka."
+
+#: static/pretix_pos/pos.js
+#, python-format
+msgid "Expired %(date)s - the seats are no longer held"
+msgstr "Propadlo %(date)s – místa už nejsou držena"
+
+#: static/pretix_pos/pos.js
+msgid "Revive until the event date"
+msgstr "Obnovit do konání akce"
