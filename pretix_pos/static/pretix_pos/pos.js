@@ -642,6 +642,15 @@
     }
 
     function getAvailableCount(subeventId, itemId, variationId) {
+        // For seated items, return available seats from the seatmap, not the quota count
+        var hasSeats = sellSeats && sellSeats.some(function (s) { return s.product_id === itemId; });
+        if (hasSeats) {
+            var available = sellSeats.filter(function (s) {
+                return s.product_id === itemId && s.status === 'available';
+            }).length;
+            return available;
+        }
+        // For non-seated items, use quota availability
         var key = subeventId != null ? String(subeventId) : "null";
         var quotas = (quotasBySubevent[key] || []).filter(function (q) {
             return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
