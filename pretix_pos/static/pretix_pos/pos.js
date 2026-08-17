@@ -764,6 +764,12 @@
             sellSeats = [];
             return;
         }
+        loadQuotas().then(function () {
+            loadSellItemsWithQuotas();
+        });
+    }
+
+    function loadSellItemsWithQuotas() {
         var seId = currentSubeventId();
         var seatsPromise = window.PretixSeatingRenderer
             ? apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
@@ -996,8 +1002,10 @@
             });
             if (idx >= 0) cart.splice(idx, 1);
         }
-        renderSellItems();
-        renderCart();
+        loadQuotas().then(function () {
+            renderSellItems();
+            renderCart();
+        });
     }
 
     function renderSeatpick() {
@@ -1490,7 +1498,9 @@
             setMsg(quickMsg, msg, result.releaseFailed ? "error" : "success");
             quickEmailInput.value = "";
             quickNameInput.value = "";
-            loadQuickReservationTab();
+            loadQuotas().then(function () {
+                loadQuickReservationTab();
+            });
         });
     }
 
