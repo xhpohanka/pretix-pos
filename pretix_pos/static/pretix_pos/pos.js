@@ -655,11 +655,18 @@
     // *most* exhausted quota - pretix requires room in every quota an
     // item/variation is linked to, not just one of them (selling one unit
     // consumes stock from all of them at once).
-    function isAvailableAt(subeventId, itemId, variationId) {
+    function quotasFor(subeventId, itemId, variationId) {
         var key = subeventId != null ? String(subeventId) : "null";
-        var quotas = (quotasBySubevent[key] || []).filter(function (q) {
-            return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
+        return (quotasBySubevent[key] || []).filter(function (q) {
+            // A variation consumes both quotas that explicitly contain the
+            // variation and quotas covering its whole product.
+            return q.items.indexOf(itemId) !== -1 ||
+                (variationId && q.variations.indexOf(variationId) !== -1);
         });
+    }
+
+    function isAvailableAt(subeventId, itemId, variationId) {
+        var quotas = quotasFor(subeventId, itemId, variationId);
         if (!quotas.length) return false;
         return quotas.every(function (q) { return q.available; });
     }
@@ -669,10 +676,7 @@
     // product can't be sold: the first is a setup step someone still has to do
     // in the backend, the second is just today's reality.
     function quotaStateFor(subeventId, itemId, variationId) {
-        var key = subeventId != null ? String(subeventId) : "null";
-        var quotas = (quotasBySubevent[key] || []).filter(function (q) {
-            return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
-        });
+        var quotas = quotasFor(subeventId, itemId, variationId);
         if (!quotas.length) return "noquota";
         return quotas.every(function (q) { return q.available; }) ? "ok" : "soldout";
     }
@@ -688,6 +692,11 @@
         }
         // For non-seated items, use quota availability
         var key = subeventId != null ? String(subeventId) : "null";
+        var quotas = quotasFor(subeventId, itemId, variationId);
+        if (!quotas.length) return 0;
+        var quotaAvailable = Math.min.apply(null, quotas.map(function (q) {
+            return q.available_number;
+        }));
         var seats = seatmapsBySubevent[key];
         if (seats) {
             // For dates with subevents the category mapping remains
@@ -699,17 +708,17 @@
                 return s.product_id === itemId;
             });
             if (hasSeats) {
-                return seats.filter(function (s) {
+                var freeSeats = seats.filter(function (s) {
                     return s.product_id === itemId && s.status === "free";
                 }).length;
+                // The seat pool is shared by all variants, but a particular
+                // variant can also have a tighter own or product-wide quota.
+                // Neither constraint alone is the number that can be sold.
+                return Math.min(freeSeats, quotaAvailable);
             }
         }
         // For non-seated items, or if no seatmap could be loaded, use quota availability.
-        var quotas = (quotasBySubevent[key] || []).filter(function (q) {
-            return variationId ? q.variations.indexOf(variationId) !== -1 : q.items.indexOf(itemId) !== -1;
-        });
-        if (!quotas.length) return 0;
-        return Math.min.apply(null, quotas.map(function (q) { return q.available_number; }));
+        return quotaAvailable;
     }
 
     function loadSubevents() {
