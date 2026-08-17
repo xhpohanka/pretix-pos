@@ -691,3 +691,9 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     font-weight: 600;
     color: #222;
 }
+
+/* Named so staff can see the product exists, greyed so it's clear it can't be
+   sold on this date. */
+.pos-item-unavailable {
+    color: #999;
+}
