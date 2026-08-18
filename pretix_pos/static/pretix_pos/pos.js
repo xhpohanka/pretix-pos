@@ -51,6 +51,10 @@
     // reservation. Keep those maps separated by date so one date can never be
     // counted using another date's seats.
     var seatmapsBySubevent = {}; // subeventId (or "null") -> drawable seats
+    var seatmapUnavailable = {}; // keys whose latest seatmap request failed
+    var seatmapAvailabilityBySubevent = {}; // keys -> aggregated availability
+    var seatmapAvailabilityRevision = null;
+    var seatmapAvailabilityUnavailable = false;
 
     function loadState() {
         try {
@@ -277,6 +281,7 @@
     var testmodeBanner = document.getElementById("pos-testmode-banner");
     var btnChangeEvent = document.getElementById("pos-btn-change-event");
     var btnUnpair = document.getElementById("pos-btn-unpair");
+    var btnRefresh = document.getElementById("pos-btn-refresh");
     var btnTill = document.getElementById("pos-btn-till");
     var tillPanel = document.getElementById("pos-till-panel");
     var tillTotalsEl = document.getElementById("pos-till-totals");
@@ -482,6 +487,7 @@
     var subeventSelect = document.getElementById("pos-subevent");
 
     var tabs = Array.prototype.slice.call(document.querySelectorAll(".pos-tab"));
+    var activeTab = "quick";
     var panels = {
         quick: document.getElementById("pos-tab-quick"),
         sell: document.getElementById("pos-tab-sell"),
@@ -489,20 +495,12 @@
     };
     tabs.forEach(function (btn) {
         btn.addEventListener("click", function () {
+            activeTab = btn.dataset.tab;
             tabs.forEach(function (b) { b.classList.toggle("active", b === btn); });
             Object.keys(panels).forEach(function (k) {
                 panels[k].hidden = k !== btn.dataset.tab;
             });
-            if (btn.dataset.tab === "find" && !searchInput.value.trim()) {
-                loadDefaultOrderList();
-            }
-            if (btn.dataset.tab === "quick" && state.event && state.event.slug) {
-                // Seat status can change underneath an already-open POS (most
-                // notably when a pending order expires). Refresh both sources
-                // when staff return to Quick reserve instead of trusting the
-                // seatmap captured during boot.
-                loadQuotas().then(loadQuickReservationTab);
-            }
+            if (state.event && state.event.slug) refreshCurrentView();
         });
     });
 
@@ -561,9 +559,13 @@
 
     function loadMainScreen() {
         showScreen("main");
+        activeTab = "quick";
+        tabs.forEach(function (b) { b.classList.toggle("active", b.dataset.tab === activeTab); });
+        Object.keys(panels).forEach(function (k) { panels[k].hidden = k !== activeTab; });
         headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
         btnChangeEvent.hidden = false;
         btnUnpair.hidden = false;
+        btnRefresh.hidden = false;
         btnTill.hidden = false;
 
         // A cart can span several dates of the same event (see subeventSelect's
@@ -574,21 +576,21 @@
         seatOverride = null;
         sellSeats = [];
         seatmapsBySubevent = {};
+        seatmapUnavailable = {};
+        seatmapAvailabilityBySubevent = {};
+        seatmapAvailabilityRevision = null;
+        seatmapAvailabilityUnavailable = false;
         renderCart();
 
-        Promise.all([loadEventInfo(), loadItemsIndex(), loadQuotas()]).then(function () {
+        Promise.all([loadEventInfo(), loadItemsIndex(), loadQuotas(), loadSeatmapAvailability()]).then(function () {
             if (state.event.hasSubevents) {
                 subeventBar.hidden = false;
                 loadSubevents().then(function () {
-                    return loadForCurrentContext().then(function () {
-                        loadQuickReservationTab();
-                    });
+                    return loadQuickReservationTab();
                 });
             } else {
                 subeventBar.hidden = true;
-                return loadForCurrentContext().then(function () {
-                    loadQuickReservationTab();
-                });
+                return loadQuickReservationTab();
             }
         });
     }
@@ -688,6 +690,33 @@
             return q.available_number;
         }));
         var seats = seatmapsBySubevent[key];
+        var availability = seatmapAvailabilityBySubevent[key];
+        if (!seats && !availability && seatmapUnavailable[key] &&
+                (subeventId != null ? !!subeventSeatingPlans[subeventId] : !!state.event.seatingPlan)) {
+            // A seatplan without a readable seatmap is not safely sellable.
+            // Never fall back to quota-only availability in that case.
+            return 0;
+        }
+        if (!seats && availability) {
+            var availabilityPool = subeventId != null
+                ? (availability.by_product[String(itemId)] || {free: 0, taken: 0, held: 0})
+                : availability.by_product[String(itemId)];
+            var mapped = subeventId != null
+                ? !!(subeventSeatedItems[subeventId] || {})[itemId]
+                : !!availabilityPool;
+            var free = mapped ? availabilityPool.free : availability.free;
+            var occupied = mapped
+                ? availabilityPool.taken + availabilityPool.held
+                : availability.taken + availability.held;
+            var unassigned = Math.max.apply(null, quotas.map(function (q) {
+                return Math.max(0, (q.size - q.available_number) - occupied);
+            }));
+            return Math.min(Math.max(0, free - unassigned), quotaAvailable);
+        }
+        if (!seats && seatmapAvailabilityUnavailable &&
+                (subeventId != null ? !!subeventSeatingPlans[subeventId] : !!state.event.seatingPlan)) {
+            return 0;
+        }
         if (seats) {
             // For dates with subevents the category mapping remains
             // authoritative even when every seat is blocked/occupied (or Seat
@@ -799,7 +828,6 @@
         // still submits everything to the right date regardless of which date
         // is currently selected.
         seatOverride = null;
-        loadForCurrentContext();
 
         // An order loaded in "Find order" has its own seatmap tied to
         // whichever date is on screen (see renderOrderDetail()) - if one is
@@ -813,7 +841,6 @@
         if (currentOrder) {
             placementPool = {};
             removalPool = {};
-            renderOrderDetail();
         }
 
         // orderSortKey() now favors an order that still needs a seat on
@@ -821,13 +848,69 @@
         // ranking is stale the moment the date changes, so re-run whatever's
         // currently shown (default browse list or an active search) to
         // re-sort against the new one.
-        doSearch();
+        refreshCurrentView();
     });
 
     function loadForCurrentContext() {
         seatOverride = null;
         return loadSellItems();
     }
+
+    // All views read availability from the same two sources: quotas and (when
+    // applicable) seatmaps. Keep one refresh chain so a quick succession of
+    // tab switches, manual refreshes, or completed mutations cannot let an
+    // older response repaint over newer data.
+    var refreshChain = Promise.resolve();
+    var availabilityRefreshTimer = null;
+
+    function refreshAvailability() {
+        refreshChain = refreshChain.catch(function () {}).then(function () {
+            return loadQuotas().then(loadSeatmapAvailability).then(function () {
+                // Do not rebuild an inactive quantity form: staff may have a
+                // draft in it. Its data is refreshed before the tab is shown.
+                if (activeTab === "quick") {
+                    // Quick uses only the aggregate response. Drop a full map
+                    // left over from Sell so it cannot shadow newer counts.
+                    seatmapsBySubevent = {};
+                    sellSeats = [];
+                }
+                return loadQuickReservationTab(activeTab === "quick");
+            });
+        });
+        return refreshChain;
+    }
+
+    function scheduleAvailabilityRefresh() {
+        if (availabilityRefreshTimer) clearTimeout(availabilityRefreshTimer);
+        availabilityRefreshTimer = setTimeout(function () {
+            availabilityRefreshTimer = null;
+            refreshAvailability();
+        }, 0);
+    }
+
+    function refreshCurrentView() {
+        return refreshAvailability().then(function () {
+            if (activeTab === "sell") {
+                return loadSellItemsWithQuotas();
+            }
+            if (activeTab === "find") {
+                var viewLoads = [];
+                if (currentOrder && currentOrder.code) viewLoads.push(loadOrderDetail(currentOrder.code));
+                viewLoads.push(searchInput.value.trim() ? doSearch() : loadDefaultOrderList());
+                return Promise.all(viewLoads);
+            }
+        });
+    }
+
+    btnRefresh.addEventListener("click", function () {
+        if (!state.event || !state.event.slug || btnRefresh.disabled) return;
+        btnRefresh.disabled = true;
+        refreshCurrentView().then(function () {
+            btnRefresh.disabled = false;
+        }, function () {
+            btnRefresh.disabled = false;
+        });
+    });
 
     // --------------------------------------------------------------- sell tab
 
@@ -860,6 +943,7 @@
     function loadSeatmap(subeventId) {
         var key = subeventId != null ? String(subeventId) : "null";
         if (!window.PretixSeatingRenderer) {
+            seatmapUnavailable[key] = true;
             delete seatmapsBySubevent[key];
             return Promise.resolve([]);
         }
@@ -868,12 +952,30 @@
             : eventPath("/seatmap/");
         return apiAllPages(path).then(function (res) {
             if (!res.ok) {
+                seatmapUnavailable[key] = true;
                 delete seatmapsBySubevent[key];
                 return [];
             }
             var seats = ((res.data && res.data.results) || []).map(toDrawSeat);
+            seatmapUnavailable[key] = false;
             seatmapsBySubevent[key] = seats;
             return seats;
+        });
+    }
+
+    function loadSeatmapAvailability() {
+        return api(eventPath("/seatmap/availability/")).then(function (res) {
+            if (!res.ok || !res.data) {
+                seatmapAvailabilityUnavailable = true;
+                return;
+            }
+            seatmapAvailabilityUnavailable = false;
+            seatmapAvailabilityRevision = res.data.revision || null;
+            seatmapAvailabilityBySubevent = {};
+            (res.data.results || []).forEach(function (result) {
+                var key = result.subevent != null ? String(result.subevent) : "null";
+                seatmapAvailabilityBySubevent[key] = result;
+            });
         });
     }
 
@@ -881,6 +983,18 @@
         var seId = currentSubeventId();
         return loadSeatmap(seId).then(function (seats) {
             sellSeats = seats;
+            if (seId != null && subeventSeatingPlans[seId] && seatmapUnavailable[String(seId)]) {
+                sellItems = [];
+                seatpickWrap.hidden = true;
+                sellItemsEl.textContent = gettext("Could not load the seating plan. Selling is temporarily unavailable.");
+                return;
+            }
+            if (seId == null && state.event.seatingPlan && seatmapUnavailable["null"]) {
+                sellItems = [];
+                seatpickWrap.hidden = true;
+                sellItemsEl.textContent = gettext("Could not load the seating plan. Selling is temporarily unavailable.");
+                return;
+            }
             var itemList = Object.keys(itemsById).map(function (id) { return itemsById[id]; })
                 .filter(function (it) { return it.active; })
                 .sort(function (a, b) { return (a.position || 0) - (b.position || 0); });
@@ -1523,6 +1637,7 @@
                 // is a leftover to finish in Edit order, not a failed sale, and
                 // saying so beats a bare success message that hides it.
                 setMsg(sellMsg, problem ? doneMsg + " " + problem : doneMsg, problem ? "error" : "success");
+                refreshCurrentView();
             });
             if (mode === "sell") addToTill(method, res.data.total);
             cart = [];
@@ -1530,7 +1645,6 @@
             emailInput.value = "";
             nameInput.value = "";
             renderCart();
-            loadSellItems();
         });
     }
 
@@ -1571,14 +1685,9 @@
         return units;
     }
 
-    function loadQuickReservationTab() {
-        var rows = state.event.hasSubevents ? subeventsList : [null];
-        var seatmapLoads = rows.filter(function (se) {
-            return !se || subeventSeatingPlans[se.id];
-        }).map(function (se) {
-            return loadSeatmap(se ? se.id : null);
-        });
-        return Promise.all(seatmapLoads).then(renderQuickReservationTab);
+    function loadQuickReservationTab(render) {
+        if (render !== false) renderQuickReservationTab();
+        return Promise.resolve();
     }
 
     function renderQuickReservationTab() {
@@ -1850,9 +1959,7 @@
             setMsg(quickMsg, msg, result.releaseFailed ? "error" : "success");
             quickEmailInput.value = "";
             quickNameInput.value = "";
-            loadQuotas().then(function () {
-                loadQuickReservationTab();
-            });
+            refreshCurrentView();
         });
     }
 
@@ -1918,11 +2025,10 @@
     function doSearch() {
         var q = searchInput.value.trim();
         if (!q) {
-            loadDefaultOrderList();
-            return;
+            return loadDefaultOrderList();
         }
         searchResultsEl.textContent = gettext("Searching…");
-        api(eventPath("/orders/?search=" + encodeURIComponent(q) + "&ordering=-datetime")).then(function (res) {
+        return api(eventPath("/orders/?search=" + encodeURIComponent(q) + "&ordering=-datetime")).then(function (res) {
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
                 return;
@@ -1997,7 +2103,7 @@
     // upfront - sorted with whatever most likely still needs attention first.
     function loadDefaultOrderList() {
         searchResultsEl.textContent = gettext("Loading…");
-        api(eventPath("/orders/?ordering=-datetime")).then(function (res) {
+        return api(eventPath("/orders/?ordering=-datetime")).then(function (res) {
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
                 return;
@@ -2069,7 +2175,7 @@
     }
 
     function loadOrderDetail(code) {
-        api(eventPath("/orders/" + encodeURIComponent(code) + "/")).then(function (res) {
+        return api(eventPath("/orders/" + encodeURIComponent(code) + "/")).then(function (res) {
             if (!res.ok) {
                 orderDetailEl.hidden = false;
                 orderDetailEl.textContent = describeError(res.data);
@@ -2343,12 +2449,13 @@
             var newSeat = orderSeats.find(function (s) { return s.guid === patchedSeat.seat_guid; });
             if (newSeat) newSeat.status = "taken";
         }
+        scheduleAvailabilityRefresh();
     }
 
     // Refills the persistent summary containers (see their declarations
     // above) from currentOrder - called both by renderOrderDetail() itself
     // (first paint for a newly loaded order / date switch) and by
-    // refreshOrderAfterEdit() (after add/cancel/refund), without ever
+    // refreshCurrentView() (after add/cancel/refund), without ever
     // touching orderDetailEl's own innerHTML or the seatmap. That's what
     // lets those actions restage the summary without redoing the expensive
     // part (refetch+redraw the whole seatmap) on every single click.
@@ -2564,21 +2671,6 @@
         }
     }
 
-    // Re-fetches currentOrder and restages the summary in place - used after
-    // add/cancel/refund instead of loadOrderDetail(), which would also
-    // refetch and completely rebuild the seatmap (see refreshOrderSummary()'s
-    // own comment) even though none of these three actions need that: a
-    // canceled/newly-added position's own seat status is patched back into
-    // the existing map via orderSeatmapRedraw() instead.
-    function refreshOrderAfterEdit() {
-        return api(eventPath("/orders/" + encodeURIComponent(currentOrder.code) + "/")).then(function (res) {
-            if (!res.ok) return;
-            currentOrder = res.data;
-            refreshOrderSummary();
-            if (orderSeatmapRedraw) orderSeatmapRedraw();
-        });
-    }
-
     function renderOrderDetail() {
         orderDetailEl.hidden = false;
         orderDetailEl.innerHTML = "";
@@ -2773,8 +2865,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            loadOrderDetail(order.code);
-            doSearch();
+            refreshCurrentView();
         });
     }
 
@@ -2850,8 +2941,7 @@
                     }
                     showBankQr(res.data);
                     setMsg(msg, gettext("Waiting for the transfer - the order stays unpaid until the money arrives."), null);
-                    loadOrderDetail(order.code);
-                    doSearch();
+                    refreshCurrentView();
                 });
             }
             return api(eventPath("/orders/" + order.code + "/payments/"), {
@@ -2870,15 +2960,7 @@
                 return;
             }
             addToTill(method, amount);
-            loadOrderDetail(order.code);
-            // loadOrderDetail() only refreshes the right-hand order detail
-            // panel - the search-results list on the left still shows this
-            // order with its old (pre-payment) status/color/sort position
-            // otherwise, since it was rendered from a snapshot fetched
-            // before this payment. Re-runs whatever's currently shown
-            // (default browse list or an active search), same as any other
-            // trigger for that list.
-            doSearch();
+            refreshCurrentView();
             });
         });
     }
@@ -2957,8 +3039,7 @@
                     return;
                 }
                 addToTill("qr", payment.amount);
-                loadOrderDetail(order.code);
-                doSearch();
+                refreshCurrentView();
             });
     }
 
@@ -2972,10 +3053,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            loadOrderDetail(order.code);
-            // Same reasoning as payOrder()'s doSearch() call - the left-hand list
-            // still shows this order's pre-cancellation status/color otherwise.
-            doSearch();
+            refreshCurrentView();
         });
     }
 
@@ -2996,8 +3074,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            refreshOrderAfterEdit();
-            doSearch();
+            refreshCurrentView();
         });
     }
 
@@ -3063,8 +3140,7 @@
                             return releaseQuickSeats(added).then(function (released) {
                                 btn.disabled = false;
                                 setMsg(msg, released ? gettext("Positions added.") : gettext("Positions added, but some temporary seats could not be released."), released ? "success" : "error");
-                                refreshOrderAfterEdit();
-                                doSearch();
+                                refreshCurrentView();
                             });
                         });
                     });
@@ -3074,8 +3150,7 @@
                 return;
             }
             btn.disabled = false;
-            refreshOrderAfterEdit();
-            doSearch();
+            refreshCurrentView();
         });
     }
 
@@ -3099,8 +3174,7 @@
                 setMsg(msg, describeError(res.data), "error");
                 return;
             }
-            refreshOrderAfterEdit();
-            doSearch();
+            refreshCurrentView();
         });
     }
 
@@ -3760,7 +3834,7 @@
         renderPlaceBtn();
 
         // Handed back to renderOrderDetail() as orderSeatmapRedraw - lets a
-        // later refreshOrderAfterEdit() put this same map's colors and
+        // later refreshCurrentView() put this same map's colors and
         // "Place N seats on M positions" button text back in sync with a
         // freshly-refetched currentOrder without tearing any of this down.
         return function () {
@@ -3781,6 +3855,7 @@
             showScreen("pair");
             btnChangeEvent.hidden = true;
             btnUnpair.hidden = true;
+            btnRefresh.hidden = true;
             btnTill.hidden = true;
             headerInfo.textContent = "";
             return;
@@ -3788,6 +3863,7 @@
         if (!state.event) {
             btnChangeEvent.hidden = true;
             btnUnpair.hidden = false;
+            btnRefresh.hidden = true;
             btnTill.hidden = false;
             headerInfo.textContent = state.deviceName || "";
             loadEvents();
