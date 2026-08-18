@@ -851,11 +851,6 @@
         refreshCurrentView();
     });
 
-    function loadForCurrentContext() {
-        seatOverride = null;
-        return loadSellItems();
-    }
-
     // All views read availability from the same two sources: quotas and (when
     // applicable) seatmaps. Keep one refresh chain so a quick succession of
     // tab switches, manual refreshes, or completed mutations cannot let an
@@ -927,17 +922,24 @@
     var btnSell = document.getElementById("pos-btn-sell");
     var sellMsg = document.getElementById("pos-sell-msg");
 
-    function loadSellItems() {
-        sellItemsEl.textContent = gettext("Loading…");
-        if (state.event.hasSubevents && !subeventSelect.value) {
-            sellItemsEl.textContent = gettext("Choose a date above.");
-            sellItems = [];
-            sellSeats = [];
-            return Promise.resolve();
+    function seatmapCacheKey(subeventId) {
+        return "pretix_pos_layout:" + ORGANIZER + ":" + state.event.slug + ":" + (subeventId != null ? subeventId : "null");
+    }
+
+    function readSeatmapLayout(subeventId) {
+        try {
+            return JSON.parse(sessionStorage.getItem(seatmapCacheKey(subeventId))) || null;
+        } catch (e) {
+            return null;
         }
-        return loadQuotas().then(function () {
-            return loadSellItemsWithQuotas();
-        });
+    }
+
+    function writeSeatmapLayout(subeventId, layout) {
+        try {
+            sessionStorage.setItem(seatmapCacheKey(subeventId), JSON.stringify(layout));
+        } catch (e) {
+            // Storage may be disabled or full; the in-memory path still works.
+        }
     }
 
     function loadSeatmap(subeventId) {
@@ -947,19 +949,43 @@
             delete seatmapsBySubevent[key];
             return Promise.resolve([]);
         }
-        var path = subeventId != null
-            ? eventPath("/subevents/" + subeventId + "/seatmap/")
-            : eventPath("/seatmap/");
-        return apiAllPages(path).then(function (res) {
-            if (!res.ok) {
+        var cached = readSeatmapLayout(subeventId);
+        var layoutPath = subeventId != null
+            ? eventPath("/subevents/" + subeventId + "/seatmap/layout/")
+            : eventPath("/seatmap/layout/");
+        if (cached && cached.revision) layoutPath += "?revision=" + encodeURIComponent(cached.revision);
+        var statePath = subeventId != null
+            ? eventPath("/subevents/" + subeventId + "/seatmap/state/")
+            : eventPath("/seatmap/state/");
+        return api(layoutPath).then(function (layoutRes) {
+            if (!layoutRes.ok || !layoutRes.data) {
                 seatmapUnavailable[key] = true;
                 delete seatmapsBySubevent[key];
                 return [];
             }
-            var seats = ((res.data && res.data.results) || []).map(toDrawSeat);
-            seatmapUnavailable[key] = false;
-            seatmapsBySubevent[key] = seats;
-            return seats;
+            var layout = layoutRes.data.seats || (cached && cached.seats);
+            if (!layout) {
+                seatmapUnavailable[key] = true;
+                delete seatmapsBySubevent[key];
+                return [];
+            }
+            var revision = layoutRes.data.revision || (cached && cached.revision);
+            if (layoutRes.data.seats) writeSeatmapLayout(subeventId, {revision: revision, seats: layoutRes.data.seats});
+            return api(statePath).then(function (stateRes) {
+                if (!stateRes.ok || !stateRes.data) {
+                    seatmapUnavailable[key] = true;
+                    delete seatmapsBySubevent[key];
+                    return [];
+                }
+                var states = {};
+                (stateRes.data.seats || []).forEach(function (s) { states[s.seat_guid] = s; });
+                var seats = layout.map(function (s) {
+                    return toDrawSeat(Object.assign({}, s, states[s.seat_guid] || {status: "free"}));
+                });
+                seatmapUnavailable[key] = false;
+                seatmapsBySubevent[key] = seats;
+                return seats;
+            });
         });
     }
 
@@ -1845,12 +1871,11 @@
         return Promise.all(Object.keys(bySubevent).map(function (key) {
             var seId = key === "_" ? null : parseInt(key, 10);
             var group = bySubevent[key];
-            return apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/")).then(function (res) {
-                var seats = (res.ok && res.data && res.data.results) || [];
+            return loadSeatmap(seId).then(function (seats) {
                 var freeByItem = {};
                 seats.forEach(function (s) {
                     if (s.status !== "free") return;
-                    (freeByItem[s.product] = freeByItem[s.product] || []).push(s.seat_guid);
+                    (freeByItem[s.product_id] = freeByItem[s.product_id] || []).push(s.guid);
                 });
                 // Whether an item needs a seat at all comes from the date's own
                 // category mapping (subeventSeatedItems), not from whether the
@@ -2717,11 +2742,9 @@
         } else if (state.event.hasSubevents && !seId) {
             seatMapPromise = Promise.resolve({noDate: true, results: []});
         } else {
-            seatMapPromise = apiAllPages(seId ? eventPath("/subevents/" + seId + "/seatmap/") : eventPath("/seatmap/"))
-                .then(function (res) {
-                    var raw = (res.ok && res.data && res.data.results) || [];
-                    return {noDate: false, results: raw.map(toDrawSeat)};
-                });
+            seatMapPromise = loadSeatmap(seId).then(function (seats) {
+                return {noDate: false, results: seats};
+            });
         }
 
         var placeMsg = document.createElement("div");
