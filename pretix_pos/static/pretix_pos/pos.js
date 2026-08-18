@@ -496,6 +496,13 @@
             if (btn.dataset.tab === "find" && !searchInput.value.trim()) {
                 loadDefaultOrderList();
             }
+            if (btn.dataset.tab === "quick" && state.event && state.event.slug) {
+                // Seat status can change underneath an already-open POS (most
+                // notably when a pending order expires). Refresh both sources
+                // when staff return to Quick reserve instead of trusting the
+                // seatmap captured during boot.
+                loadQuotas().then(loadQuickReservationTab);
+            }
         });
     });
 
@@ -671,15 +678,9 @@
     }
 
     function getAvailableCount(subeventId, itemId, variationId) {
-        // For seated items, return available seats from the seatmap, not the quota count
-        var hasSeats = sellSeats && sellSeats.some(function (s) { return s.product_id === itemId; });
-        if (hasSeats) {
-            var available = sellSeats.filter(function (s) {
-                return s.product_id === itemId && s.status === 'available';
-            }).length;
-            return available;
-        }
-        // For non-seated items, use quota availability
+        // Quick reservation can show several subevents at once. Use the
+        // seatmap belonging to this row below, never the currently selected
+        // sell/reserve date (sellSeats), and keep the quota as an upper bound.
         var key = subeventId != null ? String(subeventId) : "null";
         var quotas = quotasFor(subeventId, itemId, variationId);
         if (!quotas.length) return 0;
@@ -700,10 +701,22 @@
                 var freeSeats = seats.filter(function (s) {
                     return s.product_id === itemId && s.status === "free";
                 }).length;
+                var occupiedSeats = seats.filter(function (s) {
+                    return s.product_id === itemId && s.status !== "free" && s.status !== "blocked";
+                }).length;
+                // Quota availability also includes positions that have no seat
+                // assigned yet. Those positions do not appear as occupied in
+                // the seatmap, so subtract them from the physical free-seat
+                // pool before applying the quota limit. Otherwise a seatplan
+                // could sell past its usable capacity after a large seatless
+                // reservation.
+                var seatless = Math.max.apply(null, quotas.map(function (q) {
+                    return Math.max(0, (q.size - q.available_number) - occupiedSeats);
+                }));
                 // The seat pool is shared by all variants, but a particular
                 // variant can also have a tighter own or product-wide quota.
                 // Neither constraint alone is the number that can be sold.
-                return Math.min(freeSeats, quotaAvailable);
+                return Math.min(Math.max(0, freeSeats - seatless), quotaAvailable);
             }
             // An unmapped product can be seated on any category, but it still
             // cannot be sold past the physical capacity of this plan. Quick
@@ -712,7 +725,13 @@
             var plan = subeventId != null ? !!subeventSeatingPlans[subeventId] : seats.length > 0;
             if (plan) {
                 var allFreeSeats = seats.filter(function (s) { return s.status === "free"; }).length;
-                return Math.min(allFreeSeats, quotaAvailable);
+                var allOccupiedSeats = seats.filter(function (s) {
+                    return s.status !== "free" && s.status !== "blocked";
+                }).length;
+                var unassigned = Math.max.apply(null, quotas.map(function (q) {
+                    return Math.max(0, (q.size - q.available_number) - allOccupiedSeats);
+                }));
+                return Math.min(Math.max(0, allFreeSeats - unassigned), quotaAvailable);
             }
         }
         // For non-seated items, or if no seatmap could be loaded, use quota availability.
