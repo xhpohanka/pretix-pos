@@ -139,6 +139,10 @@ msgid "Reserved — order "
 msgstr "Rezervováno — objednávka "
 
 #: static/pretix_pos/pos.js
+msgid "Sold — order "
+msgstr "Prodáno — objednávka "
+
+#: static/pretix_pos/pos.js
 msgid ", total %(total)s."
 msgstr ", celkem %(total)s."
 
@@ -167,6 +171,10 @@ msgid "Will create a new reservation."
 msgstr "Bude vytvořena nová rezervace."
 
 #: static/pretix_pos/pos.js
+msgid "Will create a new order."
+msgstr "Bude vytvořena nová objednávka."
+
+#: static/pretix_pos/pos.js
 msgid "Change"
 msgstr "Změnit"
 
@@ -177,6 +185,10 @@ msgstr "Nalezeny odpovídající čekající rezervace. Zvolte, co provést:"
 #: static/pretix_pos/pos.js
 msgid "Create a new reservation"
 msgstr "Vytvořit novou rezervaci"
+
+#: static/pretix_pos/pos.js
+msgid "Create a new order"
+msgstr "Vytvořit novou objednávku"
 
 #: static/pretix_pos/pos.js
 msgid "Add to %(code)s (%(customer)s, %(count)s tickets)"
@@ -197,6 +209,18 @@ msgstr "Zvolte, zda vytvořit novou rezervaci, nebo přidat vstupenky do existuj
 #: static/pretix_pos/pos.js
 msgid "This order is no longer pending. Open it in Edit order to handle it."
 msgstr "Tato objednávka už nečeká na vyřízení. Otevřete ji v záložce Upravit objednávku."
+
+#: static/pretix_pos/pos.js
+msgid "This order still needs seats before it can be sold."
+msgstr "Tato objednávka ještě potřebuje usadit, než ji lze prodat."
+
+#: static/pretix_pos/pos.js
+msgid "This order has no outstanding amount to charge."
+msgstr "Tato objednávka nemá žádnou zbývající částku k úhradě."
+
+#: static/pretix_pos/pos.js
+msgid "Some temporary seats could not be released. Check the order in Edit order."
+msgstr "Některá dočasně obsazená místa se nepodařilo uvolnit. Zkontrolujte objednávku v záložce Upravit objednávku."
 
 #: static/pretix_pos/pos.js
 msgid "Sold — order %(code)s, total %(total)s."

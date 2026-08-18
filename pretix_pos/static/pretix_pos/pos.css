@@ -510,7 +510,8 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
    pending order. These are buttons, rather than a passive autocomplete list:
    staff must deliberately choose a new reservation or the exact old one to
    change. */
-.pos-quick-order-choice {
+.pos-quick-order-choice,
+.pos-sell-order-choice {
     margin-top: 8px;
     max-width: 620px;
     padding: 10px;
@@ -519,10 +520,10 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     border-radius: 6px;
 }
 
-.pos-quick-order-choice p { margin: 0 0 8px; }
-.pos-quick-order-choice .pos-actions { margin-top: 6px; }
-.pos-quick-order-choice button { margin: 0 6px 6px 0; }
-.pos-quick-order-choice .pos-order-code { font-weight: 700; }
+.pos-quick-order-choice p, .pos-sell-order-choice p { margin: 0 0 8px; }
+.pos-quick-order-choice .pos-actions, .pos-sell-order-choice .pos-actions { margin-top: 6px; }
+.pos-quick-order-choice button, .pos-sell-order-choice button { margin: 0 6px 6px 0; }
+.pos-quick-order-choice .pos-order-code, .pos-sell-order-choice .pos-order-code { font-weight: 700; }
 
 .pos-rubber-band {
     fill: rgba(51, 122, 183, 0.15);

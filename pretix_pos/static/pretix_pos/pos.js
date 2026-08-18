@@ -921,6 +921,13 @@
     var btnReserve = document.getElementById("pos-btn-reserve");
     var btnSell = document.getElementById("pos-btn-sell");
     var sellMsg = document.getElementById("pos-sell-msg");
+    var sellOrderChoiceEl = document.getElementById("pos-sell-order-choice");
+    var sellOrderCandidates = [];
+    var sellOrderDecision = null;
+    var sellOrderSearchTimer = null;
+    var sellOrderSearchRequest = 0;
+    var sellOrderSearchPending = false;
+    var sellOrderSearchFailed = false;
 
     function seatmapCacheKey(subeventId) {
         return "pretix_pos_layout:" + ORGANIZER + ":" + state.event.slug + ":" + (subeventId != null ? subeventId : "null");
@@ -1595,6 +1602,192 @@
         });
     }
 
+    function sellOrderSearchQuery() {
+        return emailInput.value.trim() || nameInput.value.trim();
+    }
+
+    function renderSellOrderChoice() {
+        sellOrderChoiceEl.innerHTML = "";
+        if (sellOrderSearchPending) {
+            sellOrderChoiceEl.textContent = gettext("Searching existing reservations…");
+            sellOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (sellOrderSearchFailed) {
+            sellOrderChoiceEl.textContent = gettext("Couldn't check existing reservations. Try again before reserving.");
+            sellOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (sellOrderDecision) {
+            var selected = document.createElement("p");
+            if (sellOrderDecision.type === "existing") {
+                selected.appendChild(document.createTextNode(gettext("Will add the selected tickets to order ")));
+                var code = document.createElement("span");
+                code.className = "pos-order-code";
+                code.textContent = sellOrderDecision.order.code;
+                selected.appendChild(code);
+                selected.appendChild(document.createTextNode(". " + gettext("The customer details on that order will not be changed.")));
+            } else {
+                selected.textContent = gettext("Will create a new order.");
+            }
+            sellOrderChoiceEl.appendChild(selected);
+            var change = document.createElement("button");
+            change.type = "button";
+            change.textContent = gettext("Change");
+            change.addEventListener("click", function () {
+                sellOrderDecision = null;
+                renderSellOrderChoice();
+            });
+            sellOrderChoiceEl.appendChild(change);
+            sellOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (!sellOrderCandidates.length) {
+            sellOrderChoiceEl.hidden = true;
+            return;
+        }
+        var prompt = document.createElement("p");
+        prompt.textContent = gettext("Matching pending reservations found. Choose what to do:");
+        sellOrderChoiceEl.appendChild(prompt);
+        var newBtn = document.createElement("button");
+        newBtn.type = "button";
+        newBtn.textContent = gettext("Create a new order");
+        newBtn.addEventListener("click", function () {
+            sellOrderDecision = {type: "new"};
+            renderSellOrderChoice();
+        });
+        sellOrderChoiceEl.appendChild(newBtn);
+        sellOrderCandidates.forEach(function (order) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "pos-btn-primary";
+            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets)"), {
+                code: order.code,
+                customer: orderCustomerLabel(order),
+                count: quickOrderPositionCount(order),
+            }, true);
+            btn.addEventListener("click", function () {
+                sellOrderDecision = {type: "existing", order: order};
+                renderSellOrderChoice();
+            });
+            sellOrderChoiceEl.appendChild(btn);
+        });
+        sellOrderChoiceEl.hidden = false;
+    }
+
+    function searchSellOrders() {
+        var query = sellOrderSearchQuery();
+        var request = ++sellOrderSearchRequest;
+        sellOrderSearchPending = false;
+        sellOrderSearchFailed = false;
+        sellOrderCandidates = [];
+        if (query.length < 3) {
+            renderSellOrderChoice();
+            return;
+        }
+        sellOrderSearchPending = true;
+        renderSellOrderChoice();
+        api(eventPath("/orders/?search=" + encodeURIComponent(query) + "&ordering=-datetime")).then(function (res) {
+            if (request !== sellOrderSearchRequest) return;
+            sellOrderSearchPending = false;
+            if (!res.ok) {
+                sellOrderSearchFailed = true;
+                renderSellOrderChoice();
+                return;
+            }
+            sellOrderCandidates = ((res.data && res.data.results) || []).filter(function (order) {
+                return order.status === "n";
+            });
+            renderSellOrderChoice();
+        });
+    }
+
+    function scheduleSellOrderSearch() {
+        sellOrderDecision = null;
+        sellOrderSearchFailed = false;
+        if (sellOrderSearchTimer) window.clearTimeout(sellOrderSearchTimer);
+        sellOrderSearchTimer = window.setTimeout(searchSellOrders, 250);
+    }
+
+    emailInput.addEventListener("input", scheduleSellOrderSearch);
+    nameInput.addEventListener("input", scheduleSellOrderSearch);
+
+    // This follows Sell now's existing semantics: even a QR-labelled till sale
+    // is recorded as a completed box-office payment. The important difference
+    // from payOrder() in Edit order is deliberate: that screen's QR workflow
+    // waits for a bank transfer, while Sell now must finish the sale now.
+    function sellExistingOrder(order, method) {
+        if (!orderIsSeated(order)) {
+            return Promise.resolve({error: gettext("This order still needs seats before it can be sold.")});
+        }
+        var amount = pendingSum(order);
+        if (parseFloat(amount) <= 0) {
+            return Promise.resolve({error: gettext("This order has no outstanding amount to charge.")});
+        }
+        var pendingPayments = (order.payments || []).filter(function (p) {
+            return p.state === "created" || p.state === "pending";
+        });
+        return Promise.all(pendingPayments.map(function (p) {
+            return api(eventPath("/orders/" + order.code + "/payments/" + p.local_id + "/cancel/"), {method: "POST"});
+        })).then(function (cancellations) {
+            var failed = cancellations.find(function (res) { return !res.ok; });
+            if (failed) return {error: describeError(failed.data)};
+            return api(eventPath("/orders/" + order.code + "/payments/"), {
+                method: "POST",
+                body: JSON.stringify({provider: "boxoffice", amount: amount, state: "created", info: {payment_type: method}}),
+            }).then(function (res) {
+                if (!res.ok) return {error: describeError(res.data)};
+                return api(eventPath("/orders/" + order.code + "/payments/" + res.data.local_id + "/confirm/"), {method: "POST"});
+            }).then(function (res) {
+                if (!res || !res.ok) return {error: res ? describeError(res.data) : gettext("Unknown error.")};
+                addToTill(method, amount);
+                return api(eventPath("/orders/" + encodeURIComponent(order.code) + "/")).then(function (updated) {
+                    return updated.ok ? {order: updated.data} : {error: describeError(updated.data)};
+                });
+            });
+        });
+    }
+
+    function submitToExistingOrder(mode, selectedOrder, positions, method) {
+        return api(eventPath("/orders/" + encodeURIComponent(selectedOrder.code) + "/")).then(function (res) {
+            if (!res.ok) return {error: describeError(res.data)};
+            if (res.data.status !== "n") {
+                return {error: gettext("This order is no longer pending. Open it in Edit order to handle it.")};
+            }
+            return addQuickPositionsToOrder(res.data, positions).then(function (result) {
+                if (result.error) return result;
+                result.positionsAdded = true;
+                if (mode === "reserve") return result;
+                return sellExistingOrder(result.order, method).then(function (sale) {
+                    sale.positionsAdded = true;
+                    if (sale.error) return sale;
+                    sale.releaseFailed = result.releaseFailed;
+                    return sale;
+                });
+            });
+        });
+    }
+
+    function setSellOrderSuccess(order, mode, problem) {
+        sellMsg.innerHTML = "";
+        sellMsg.className = "pos-msg " + (problem ? "pos-error" : "pos-success");
+        sellMsg.appendChild(document.createTextNode(
+            mode === "sell" ? gettext("Sold — order ") : gettext("Reserved — order ")
+        ));
+        var link = document.createElement("a");
+        link.href = "#";
+        link.textContent = order.code;
+        link.addEventListener("click", function (e) {
+            e.preventDefault();
+            switchToFindOrderTab();
+            loadOrderDetail(order.code);
+        });
+        sellMsg.appendChild(link);
+        sellMsg.appendChild(document.createTextNode(
+            interpolate(gettext(", total %(total)s."), {total: order.total}, true) + (problem ? " " + problem : "")
+        ));
+    }
+
     function submitOrder(mode) {
         var positions = buildPositions();
         if (!positions.length) return;
@@ -1621,10 +1814,54 @@
             setMsg(sellMsg, gettext("Can't reach the server to check whether this event is in test mode - reload the page before selling."), "error");
             return;
         }
+        if (sellOrderSearchPending) {
+            setMsg(sellMsg, gettext("Wait for the existing-reservation search before reserving."), "error");
+            return;
+        }
+        if (sellOrderSearchFailed) {
+            setMsg(sellMsg, gettext("Couldn't check existing reservations. Correct the customer details or try again."), "error");
+            return;
+        }
+        if (sellOrderCandidates.length && !sellOrderDecision) {
+            setMsg(sellMsg, gettext("Choose whether to create a new reservation or add to an existing one."), "error");
+            return;
+        }
         var method = paymentMethodSelect.value;
         btnReserve.disabled = true;
         btnSell.disabled = true;
         setMsg(sellMsg, gettext("Submitting…"), null);
+        var existing = sellOrderDecision && sellOrderDecision.type === "existing" ? sellOrderDecision.order : null;
+        if (existing) {
+            submitToExistingOrder(mode, existing, positions, method).then(function (result) {
+                if (result.error) {
+                    setMsg(sellMsg, result.error, "error");
+                    // Adding positions succeeded before a later payment/seating
+                    // step failed. Do not leave the same cart ready to be sent
+                    // again, or a retry would duplicate those tickets.
+                    if (result.positionsAdded) {
+                        cart = [];
+                        seatOverride = null;
+                    }
+                    renderSellItems();
+                    renderCart();
+                    return;
+                }
+                setSellOrderSuccess(result.order, mode, result.releaseFailed
+                    ? gettext("Some temporary seats could not be released. Check the order in Edit order.")
+                    : null);
+                cart = [];
+                seatOverride = null;
+                emailInput.value = "";
+                nameInput.value = "";
+                sellOrderCandidates = [];
+                sellOrderDecision = null;
+                renderSellOrderChoice();
+                renderSellItems();
+                renderCart();
+                refreshCurrentView();
+            });
+            return;
+        }
         // Strips the seats the create endpoint would refuse and remembers them
         // for the follow-up call below.
         var deferredSeats = splitCartForSubmit(positions);
@@ -1652,9 +1889,6 @@
             // still need to know how much to actually collect from the
             // customer standing right there - losing that number the moment
             // the sale completes was the whole problem being fixed here.
-            var doneMsg = mode === "sell"
-                ? interpolate(gettext("Sold — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true)
-                : interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: res.data.code, total: res.data.total}, true);
             var seatingDone = deferredSeats.length
                 ? seatDeferredPositions(res.data, deferredSeats)
                 : Promise.resolve(null);
@@ -1662,7 +1896,7 @@
                 // The order exists either way - a seat that couldn't be placed
                 // is a leftover to finish in Edit order, not a failed sale, and
                 // saying so beats a bare success message that hides it.
-                setMsg(sellMsg, problem ? doneMsg + " " + problem : doneMsg, problem ? "error" : "success");
+                setSellOrderSuccess(res.data, mode, problem);
                 refreshCurrentView();
             });
             if (mode === "sell") addToTill(method, res.data.total);
