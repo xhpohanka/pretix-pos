@@ -135,6 +135,70 @@ msgid "Submitting…"
 msgstr "Odesílání…"
 
 #: static/pretix_pos/pos.js
+msgid "Reserved — order "
+msgstr "Rezervováno — objednávka "
+
+#: static/pretix_pos/pos.js
+msgid ", total %(total)s."
+msgstr ", celkem %(total)s."
+
+#: static/pretix_pos/pos.js
+msgid ", total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."
+msgstr ", celkem %(total)s - ale nepodařilo se uvolnit všechna zástupná místa, zkontrolujte záložku Upravit objednávku."
+
+#: static/pretix_pos/pos.js
+msgid "Searching existing reservations…"
+msgstr "Vyhledávání existujících rezervací…"
+
+#: static/pretix_pos/pos.js
+msgid "Couldn't check existing reservations. Try again before reserving."
+msgstr "Nepodařilo se ověřit existující rezervace. Zkuste to před rezervací znovu."
+
+#: static/pretix_pos/pos.js
+msgid "Will add the selected tickets to order "
+msgstr "Vybrané vstupenky budou přidány do objednávky "
+
+#: static/pretix_pos/pos.js
+msgid "The customer details on that order will not be changed."
+msgstr "Údaje zákazníka v této objednávce se nezmění."
+
+#: static/pretix_pos/pos.js
+msgid "Will create a new reservation."
+msgstr "Bude vytvořena nová rezervace."
+
+#: static/pretix_pos/pos.js
+msgid "Change"
+msgstr "Změnit"
+
+#: static/pretix_pos/pos.js
+msgid "Matching pending reservations found. Choose what to do:"
+msgstr "Nalezeny odpovídající čekající rezervace. Zvolte, co provést:"
+
+#: static/pretix_pos/pos.js
+msgid "Create a new reservation"
+msgstr "Vytvořit novou rezervaci"
+
+#: static/pretix_pos/pos.js
+msgid "Add to %(code)s (%(customer)s, %(count)s tickets)"
+msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek)"
+
+#: static/pretix_pos/pos.js
+msgid "Wait for the existing-reservation search before reserving."
+msgstr "Před rezervací počkejte na dokončení vyhledávání existujících rezervací."
+
+#: static/pretix_pos/pos.js
+msgid "Couldn't check existing reservations. Correct the customer details or try again."
+msgstr "Nepodařilo se ověřit existující rezervace. Upravte údaje zákazníka nebo to zkuste znovu."
+
+#: static/pretix_pos/pos.js
+msgid "Choose whether to create a new reservation or add to an existing one."
+msgstr "Zvolte, zda vytvořit novou rezervaci, nebo přidat vstupenky do existující."
+
+#: static/pretix_pos/pos.js
+msgid "This order is no longer pending. Open it in Edit order to handle it."
+msgstr "Tato objednávka už nečeká na vyřízení. Otevřete ji v záložce Upravit objednávku."
+
+#: static/pretix_pos/pos.js
 msgid "Sold — order %(code)s, total %(total)s."
 msgstr "Prodáno — objednávka %(code)s, celkem %(total)s."
 

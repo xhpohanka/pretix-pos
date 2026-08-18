@@ -1690,6 +1690,13 @@
     var quickNameInput = document.getElementById("pos-quick-name");
     var quickBtnReserve = document.getElementById("pos-quick-btn-reserve");
     var quickMsg = document.getElementById("pos-quick-msg");
+    var quickOrderChoiceEl = document.getElementById("pos-quick-order-choice");
+    var quickOrderCandidates = [];
+    var quickOrderDecision = null;
+    var quickOrderSearchTimer = null;
+    var quickOrderSearchRequest = 0;
+    var quickOrderSearchPending = false;
+    var quickOrderSearchFailed = false;
 
     function quickOrderableUnits() {
         // Same active-item filter as loadSellItems() - one unit per variation
@@ -1946,6 +1953,179 @@
         });
     }
 
+    // The order-change endpoint accepts all new positions in one batch, just
+    // like the Sell/Reserve tab. Keep Quick reservation's seat workaround in
+    // this shared-shaped helper too: a customer-choice seatmap needs temporary
+    // seats for the API validation, then returns the new positions to the
+    // ordinary "needs seating" queue.
+    function addQuickPositionsToOrder(order, positions) {
+        var changePath = eventPath("/orders/" + encodeURIComponent(order.code) + "/change/");
+        var beforeIds = (order.positions || []).map(function (p) { return p.id; });
+        function submitCreate(createPositions) {
+            return api(changePath, {
+                method: "POST",
+                body: JSON.stringify({create_positions: createPositions, send_email: !!order.email}),
+            });
+        }
+        return submitCreate(positions).then(function (res) {
+            if (res.ok) return {order: res.data};
+            if (!(res.data && res.data.seat)) return {error: describeError(res.data)};
+            return assignQuickSeats(positions).then(function (enough) {
+                if (!enough) {
+                    return {error: gettext("Not enough free seats left for one of these dates/items - try a smaller quantity.")};
+                }
+                return submitCreate(positions).then(function (res2) {
+                    if (!res2.ok) return {error: describeError(res2.data)};
+                    var added = (res2.data.positions || []).filter(function (p) {
+                        return beforeIds.indexOf(p.id) === -1;
+                    });
+                    return releaseQuickSeats(added).then(function (allReleased) {
+                        return {order: res2.data, releaseFailed: !allReleased};
+                    });
+                });
+            });
+        });
+    }
+
+    function quickOrderSearchQuery() {
+        // E-mail is the more precise identifier. A name remains useful for
+        // phone reservations without an e-mail address.
+        return quickEmailInput.value.trim() || quickNameInput.value.trim();
+    }
+
+    function quickOrderPositionCount(order) {
+        return (order.positions || []).filter(function (p) { return !p.canceled; }).length;
+    }
+
+    function renderQuickOrderChoice() {
+        quickOrderChoiceEl.innerHTML = "";
+        if (quickOrderSearchPending) {
+            quickOrderChoiceEl.textContent = gettext("Searching existing reservations…");
+            quickOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (quickOrderSearchFailed) {
+            quickOrderChoiceEl.textContent = gettext("Couldn't check existing reservations. Try again before reserving.");
+            quickOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (quickOrderDecision) {
+            var selected = document.createElement("p");
+            if (quickOrderDecision.type === "existing") {
+                selected.appendChild(document.createTextNode(gettext("Will add the selected tickets to order ")));
+                var code = document.createElement("span");
+                code.className = "pos-order-code";
+                code.textContent = quickOrderDecision.order.code;
+                selected.appendChild(code);
+                selected.appendChild(document.createTextNode(". " + gettext("The customer details on that order will not be changed.")));
+            } else {
+                selected.textContent = gettext("Will create a new reservation.");
+            }
+            quickOrderChoiceEl.appendChild(selected);
+            var change = document.createElement("button");
+            change.type = "button";
+            change.textContent = gettext("Change");
+            change.addEventListener("click", function () {
+                quickOrderDecision = null;
+                renderQuickOrderChoice();
+            });
+            quickOrderChoiceEl.appendChild(change);
+            quickOrderChoiceEl.hidden = false;
+            return;
+        }
+        if (!quickOrderCandidates.length) {
+            quickOrderChoiceEl.hidden = true;
+            return;
+        }
+        var prompt = document.createElement("p");
+        prompt.textContent = gettext("Matching pending reservations found. Choose what to do:");
+        quickOrderChoiceEl.appendChild(prompt);
+        var newBtn = document.createElement("button");
+        newBtn.type = "button";
+        newBtn.textContent = gettext("Create a new reservation");
+        newBtn.addEventListener("click", function () {
+            quickOrderDecision = {type: "new"};
+            renderQuickOrderChoice();
+        });
+        quickOrderChoiceEl.appendChild(newBtn);
+        quickOrderCandidates.forEach(function (order) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "pos-btn-primary";
+            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets)"), {
+                code: order.code,
+                customer: orderCustomerLabel(order),
+                count: quickOrderPositionCount(order),
+            }, true);
+            btn.addEventListener("click", function () {
+                quickOrderDecision = {type: "existing", order: order};
+                renderQuickOrderChoice();
+            });
+            quickOrderChoiceEl.appendChild(btn);
+        });
+        quickOrderChoiceEl.hidden = false;
+    }
+
+    function searchQuickOrders() {
+        var query = quickOrderSearchQuery();
+        var request = ++quickOrderSearchRequest;
+        quickOrderSearchPending = false;
+        quickOrderSearchFailed = false;
+        quickOrderCandidates = [];
+        if (query.length < 3) {
+            renderQuickOrderChoice();
+            return;
+        }
+        quickOrderSearchPending = true;
+        renderQuickOrderChoice();
+        api(eventPath("/orders/?search=" + encodeURIComponent(query) + "&ordering=-datetime")).then(function (res) {
+            if (request !== quickOrderSearchRequest) return;
+            quickOrderSearchPending = false;
+            if (!res.ok) {
+                quickOrderSearchFailed = true;
+                renderQuickOrderChoice();
+                return;
+            }
+            // Only a still-pending reservation is safe to extend here. Paid,
+            // expired and canceled orders have distinct business actions in
+            // Edit order and must never be changed by this convenience flow.
+            quickOrderCandidates = ((res.data && res.data.results) || []).filter(function (order) {
+                return order.status === "n";
+            });
+            renderQuickOrderChoice();
+        });
+    }
+
+    function scheduleQuickOrderSearch() {
+        quickOrderDecision = null;
+        quickOrderSearchFailed = false;
+        if (quickOrderSearchTimer) window.clearTimeout(quickOrderSearchTimer);
+        quickOrderSearchTimer = window.setTimeout(searchQuickOrders, 250);
+    }
+
+    quickEmailInput.addEventListener("input", scheduleQuickOrderSearch);
+    quickNameInput.addEventListener("input", scheduleQuickOrderSearch);
+
+    function setQuickOrderSuccess(result) {
+        quickMsg.innerHTML = "";
+        quickMsg.className = "pos-msg " + (result.releaseFailed ? "pos-error" : "pos-success");
+        quickMsg.appendChild(document.createTextNode(gettext("Reserved — order ")));
+        var link = document.createElement("a");
+        link.href = "#";
+        link.textContent = result.order.code;
+        link.addEventListener("click", function (e) {
+            e.preventDefault();
+            switchToFindOrderTab();
+            loadOrderDetail(result.order.code);
+        });
+        quickMsg.appendChild(link);
+        quickMsg.appendChild(document.createTextNode(
+            result.releaseFailed
+                ? interpolate(gettext(", total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."), {total: result.order.total}, true)
+                : interpolate(gettext(", total %(total)s."), {total: result.order.total}, true)
+        ));
+    }
+
     function submitQuickReservation() {
         var positions = buildQuickPositions();
         if (!positions.length) {
@@ -1965,25 +2145,53 @@
             setMsg(quickMsg, gettext("Can't reach the server to check whether this event is in test mode - reload the page before selling."), "error");
             return;
         }
+        if (quickOrderSearchPending) {
+            setMsg(quickMsg, gettext("Wait for the existing-reservation search before reserving."), "error");
+            return;
+        }
+        if (quickOrderSearchFailed) {
+            setMsg(quickMsg, gettext("Couldn't check existing reservations. Correct the customer details or try again."), "error");
+            return;
+        }
+        if (quickOrderCandidates.length && !quickOrderDecision) {
+            setMsg(quickMsg, gettext("Choose whether to create a new reservation or add to an existing one."), "error");
+            return;
+        }
         if (name) positions.forEach(function (p) { p.attendee_name = name; });
         quickBtnReserve.disabled = true;
         setMsg(quickMsg, gettext("Submitting…"), null);
-        var body = {status: "n", positions: positions, testmode: !!state.event.testmode};
-        if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
-        if (email) body.email = email;
-        body.send_email = !!email;
-        createQuickOrder(body, positions).then(function (result) {
+        var existing = quickOrderDecision && quickOrderDecision.type === "existing" ? quickOrderDecision.order : null;
+        var request;
+        if (existing) {
+            // Search results can be stale by the time the cashier presses
+            // Reserve. Refetching both verifies that it is still pending and
+            // gives us the current position IDs for safe placeholder cleanup.
+            request = api(eventPath("/orders/" + encodeURIComponent(existing.code) + "/")).then(function (res) {
+                if (!res.ok) return {error: describeError(res.data)};
+                if (res.data.status !== "n") {
+                    return {error: gettext("This order is no longer pending. Open it in Edit order to handle it.")};
+                }
+                return addQuickPositionsToOrder(res.data, positions);
+            });
+        } else {
+            var body = {status: "n", positions: positions, testmode: !!state.event.testmode};
+            if (SALES_CHANNEL) body.sales_channel = SALES_CHANNEL;
+            if (email) body.email = email;
+            body.send_email = !!email;
+            request = createQuickOrder(body, positions);
+        }
+        request.then(function (result) {
             quickBtnReserve.disabled = false;
             if (result.error) {
                 setMsg(quickMsg, result.error, "error");
                 return;
             }
-            var msg = result.releaseFailed
-                ? interpolate(gettext("Reserved — order %(code)s, total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."), {code: result.order.code, total: result.order.total}, true)
-                : interpolate(gettext("Reserved — order %(code)s, total %(total)s."), {code: result.order.code, total: result.order.total}, true);
-            setMsg(quickMsg, msg, result.releaseFailed ? "error" : "success");
+            setQuickOrderSuccess(result);
             quickEmailInput.value = "";
             quickNameInput.value = "";
+            quickOrderCandidates = [];
+            quickOrderDecision = null;
+            renderQuickOrderChoice();
             refreshCurrentView();
         });
     }
