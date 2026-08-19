@@ -485,6 +485,8 @@
 
     var subeventBar = document.getElementById("pos-subevent-bar");
     var subeventSelect = document.getElementById("pos-subevent");
+    var subeventSellSlot = document.getElementById("pos-subevent-slot-sell");
+    var subeventFindSlot = document.getElementById("pos-subevent-slot-find");
 
     var tabs = Array.prototype.slice.call(document.querySelectorAll(".pos-tab"));
     var activeTab = "quick";
@@ -493,9 +495,19 @@
         sell: document.getElementById("pos-tab-sell"),
         find: document.getElementById("pos-tab-find"),
     };
+
+    // A date is a property of the terminal, not of one tab: both selling and
+    // editing an order use it to choose the seatmap. Move the one select to
+    // the active view instead of keeping two controls that could disagree.
+    function placeSubeventBar(tab) {
+        var target = tab === "find" ? subeventFindSlot : subeventSellSlot;
+        if (target && subeventBar.parentNode !== target) target.appendChild(subeventBar);
+    }
+
     tabs.forEach(function (btn) {
         btn.addEventListener("click", function () {
             activeTab = btn.dataset.tab;
+            placeSubeventBar(activeTab);
             tabs.forEach(function (b) { b.classList.toggle("active", b === btn); });
             Object.keys(panels).forEach(function (k) {
                 panels[k].hidden = k !== btn.dataset.tab;
@@ -560,6 +572,7 @@
     function loadMainScreen() {
         showScreen("main");
         activeTab = "quick";
+        placeSubeventBar(activeTab);
         tabs.forEach(function (b) { b.classList.toggle("active", b.dataset.tab === activeTab); });
         Object.keys(panels).forEach(function (k) { panels[k].hidden = k !== activeTab; });
         headerInfo.textContent = (state.deviceName ? state.deviceName + " · " : "") + state.event.name;
@@ -1647,7 +1660,7 @@
             return;
         }
         var prompt = document.createElement("p");
-        prompt.textContent = gettext("Matching pending reservations found. Choose what to do:");
+        prompt.textContent = gettext("Matching orders found. Choose what to do:");
         sellOrderChoiceEl.appendChild(prompt);
         var newBtn = document.createElement("button");
         newBtn.type = "button";
@@ -1661,10 +1674,11 @@
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "pos-btn-primary";
-            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets)"), {
+            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets, %(status)s)"), {
                 code: order.code,
                 customer: orderCustomerLabel(order),
                 count: quickOrderPositionCount(order),
+                status: order.status === "p" ? gettext("paid") : gettext("pending"),
             }, true);
             btn.addEventListener("click", function () {
                 sellOrderDecision = {type: "existing", order: order};
@@ -1696,7 +1710,7 @@
                 return;
             }
             sellOrderCandidates = ((res.data && res.data.results) || []).filter(function (order) {
-                return order.status === "n";
+                return order.status === "n" || order.status === "p";
             });
             renderSellOrderChoice();
         });
@@ -1721,9 +1735,11 @@
             return Promise.resolve({error: gettext("This order still needs seats before it can be sold.")});
         }
         var amount = pendingSum(order);
-        if (parseFloat(amount) <= 0) {
-            return Promise.resolve({error: gettext("This order has no outstanding amount to charge.")});
-        }
+        // Free VIP positions and other zero-price changes leave a paid order
+        // with no difference to collect. It is already settled, so adding a
+        // zero-amount payment would be misleading and may be rejected by a
+        // payment provider.
+        if (parseFloat(amount) <= 0) return Promise.resolve({order: order});
         var pendingPayments = (order.payments || []).filter(function (p) {
             return p.state === "created" || p.state === "pending";
         });
@@ -1751,8 +1767,8 @@
     function submitToExistingOrder(mode, selectedOrder, positions, method) {
         return api(eventPath("/orders/" + encodeURIComponent(selectedOrder.code) + "/")).then(function (res) {
             if (!res.ok) return {error: describeError(res.data)};
-            if (res.data.status !== "n") {
-                return {error: gettext("This order is no longer pending. Open it in Edit order to handle it.")};
+            if (res.data.status !== "n" && res.data.status !== "p") {
+                return {error: gettext("This order can no longer be changed here. Open it in Edit order to handle it.")};
             }
             return addQuickPositionsToOrder(res.data, positions).then(function (result) {
                 if (result.error) return result;
@@ -2272,7 +2288,7 @@
             return;
         }
         var prompt = document.createElement("p");
-        prompt.textContent = gettext("Matching pending reservations found. Choose what to do:");
+        prompt.textContent = gettext("Matching orders found. Choose what to do:");
         quickOrderChoiceEl.appendChild(prompt);
         var newBtn = document.createElement("button");
         newBtn.type = "button";
@@ -2286,10 +2302,11 @@
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "pos-btn-primary";
-            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets)"), {
+            btn.textContent = interpolate(gettext("Add to %(code)s (%(customer)s, %(count)s tickets, %(status)s)"), {
                 code: order.code,
                 customer: orderCustomerLabel(order),
                 count: quickOrderPositionCount(order),
+                status: order.status === "p" ? gettext("paid") : gettext("pending"),
             }, true);
             btn.addEventListener("click", function () {
                 quickOrderDecision = {type: "existing", order: order};
@@ -2320,11 +2337,12 @@
                 renderQuickOrderChoice();
                 return;
             }
-            // Only a still-pending reservation is safe to extend here. Paid,
-            // expired and canceled orders have distinct business actions in
-            // Edit order and must never be changed by this convenience flow.
+            // A paid order may be extended too: Quick reservation sends its
+            // normal order-change e-mail, and any resulting difference stays
+            // due. Expired and canceled orders still have to be handled in
+            // Edit order first.
             quickOrderCandidates = ((res.data && res.data.results) || []).filter(function (order) {
-                return order.status === "n";
+                return order.status === "n" || order.status === "p";
             });
             renderQuickOrderChoice();
         });
@@ -2398,12 +2416,12 @@
         var request;
         if (existing) {
             // Search results can be stale by the time the cashier presses
-            // Reserve. Refetching both verifies that it is still pending and
-            // gives us the current position IDs for safe placeholder cleanup.
+            // Reserve. Refetching verifies that it is still mutable and gives
+            // us current position IDs for safe placeholder cleanup.
             request = api(eventPath("/orders/" + encodeURIComponent(existing.code) + "/")).then(function (res) {
                 if (!res.ok) return {error: describeError(res.data)};
-                if (res.data.status !== "n") {
-                    return {error: gettext("This order is no longer pending. Open it in Edit order to handle it.")};
+                if (res.data.status !== "n" && res.data.status !== "p") {
+                    return {error: gettext("This order can no longer be changed here. Open it in Edit order to handle it.")};
                 }
                 return addQuickPositionsToOrder(res.data, positions);
             });

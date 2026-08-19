@@ -105,11 +105,6 @@
                     </div>
                 </section>
 
-                <div id="pos-subevent-bar" hidden>
-                    <label for="pos-subevent">{% trans "Date" %}</label>
-                    <select id="pos-subevent"></select>
-                </div>
-
                 <nav id="pos-tabs">
                     <button type="button" class="pos-tab active" data-tab="quick">{% trans "Quick reservation" %}</button>
                     <button type="button" class="pos-tab" data-tab="sell">{% trans "Sell / Reserve" %}</button>
@@ -134,6 +129,12 @@
                 <div id="pos-tab-sell" class="pos-tab-panel" hidden>
                     <div class="pos-columns">
                         <div class="pos-col pos-col-items">
+                            <div id="pos-subevent-slot-sell">
+                                <div id="pos-subevent-bar" hidden>
+                                    <label for="pos-subevent">{% trans "Date" %}</label>
+                                    <select id="pos-subevent"></select>
+                                </div>
+                            </div>
                             <h2>{% trans "Items" %}</h2>
                             <div id="pos-items" class="pos-msg">{% trans "Loading…" %}</div>
 
@@ -172,6 +173,7 @@
                 <div id="pos-tab-find" class="pos-tab-panel" hidden>
                     <div class="pos-columns">
                         <div class="pos-col pos-col-items">
+                            <div id="pos-subevent-slot-find"></div>
                             {% comment %}
                             The how-it-works text is set as this heading's tooltip
                             from pos.js (setSeatmapHelp) - it's long, and as a

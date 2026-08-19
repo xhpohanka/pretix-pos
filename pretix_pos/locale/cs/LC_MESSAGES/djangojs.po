@@ -183,6 +183,10 @@ msgid "Matching pending reservations found. Choose what to do:"
 msgstr "Nalezeny odpovídající čekající rezervace. Zvolte, co provést:"
 
 #: static/pretix_pos/pos.js
+msgid "Matching orders found. Choose what to do:"
+msgstr "Nalezeny odpovídající objednávky. Zvolte, co provést:"
+
+#: static/pretix_pos/pos.js
 msgid "Create a new reservation"
 msgstr "Vytvořit novou rezervaci"
 
@@ -193,6 +197,18 @@ msgstr "Vytvořit novou objednávku"
 #: static/pretix_pos/pos.js
 msgid "Add to %(code)s (%(customer)s, %(count)s tickets)"
 msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek)"
+
+#: static/pretix_pos/pos.js
+msgid "Add to %(code)s (%(customer)s, %(count)s tickets, %(status)s)"
+msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek, %(status)s)"
+
+#: static/pretix_pos/pos.js
+msgid "paid"
+msgstr "zaplaceno"
+
+#: static/pretix_pos/pos.js
+msgid "pending"
+msgstr "čeká na úhradu"
 
 #: static/pretix_pos/pos.js
 msgid "Wait for the existing-reservation search before reserving."
@@ -209,6 +225,14 @@ msgstr "Zvolte, zda vytvořit novou rezervaci, nebo přidat vstupenky do existuj
 #: static/pretix_pos/pos.js
 msgid "This order is no longer pending. Open it in Edit order to handle it."
 msgstr "Tato objednávka už nečeká na vyřízení. Otevřete ji v záložce Upravit objednávku."
+
+#: static/pretix_pos/pos.js
+msgid "This order can no longer be changed here. Open it in Edit order to handle it."
+msgstr "Tuto objednávku už zde nelze upravit. Otevřete ji v záložce Upravit objednávku."
+
+#: static/pretix_pos/pos.js
+msgid "Use Sell now to add tickets to an already paid order, so any difference can be charged immediately."
+msgstr "Pro přidání vstupenek do už zaplacené objednávky použijte Prodat nyní, aby se případný rozdíl ihned uhradil."
 
 #: static/pretix_pos/pos.js
 msgid "This order still needs seats before it can be sold."
