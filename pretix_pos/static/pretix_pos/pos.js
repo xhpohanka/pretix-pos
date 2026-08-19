@@ -3233,6 +3233,23 @@
             orderPayBlockEl.appendChild(expiryMsg);
         }
 
+        if (order.status === "c") {
+            var reactivateRow = document.createElement("div");
+            reactivateRow.className = "pos-pay-row";
+            var reactivateMsg = document.createElement("div");
+            reactivateMsg.className = "pos-msg";
+            var reactivateBtn = document.createElement("button");
+            reactivateBtn.type = "button";
+            reactivateBtn.className = "pos-btn-secondary";
+            reactivateBtn.textContent = gettext("Reactivate order");
+            reactivateBtn.addEventListener("click", function () {
+                reactivateOrder(order, reactivateBtn, reactivateMsg);
+            });
+            reactivateRow.appendChild(reactivateBtn);
+            orderPayBlockEl.appendChild(reactivateRow);
+            orderPayBlockEl.appendChild(reactivateMsg);
+        }
+
         orderCancelBlockEl.innerHTML = "";
         if (orderCapabilities(order).cancel) {
             var cancelMsg = document.createElement("div");
@@ -3631,6 +3648,21 @@
         btn.disabled = true;
         setMsg(msg, gettext("Canceling…"), null);
         api(eventPath("/orders/" + order.code + "/mark_canceled/"), {method: "POST"}).then(function (res) {
+            if (!res.ok) {
+                btn.disabled = false;
+                setMsg(msg, describeError(res.data), "error");
+                return;
+            }
+            refreshCurrentView();
+        });
+    }
+
+    function reactivateOrder(order, btn, msg) {
+        if (!orderCapabilities(order).restore || order.status !== "c") return;
+        if (!window.confirm(gettext("Reactivate this canceled order?"))) return;
+        btn.disabled = true;
+        setMsg(msg, gettext("Reactivating…"), null);
+        api(eventPath("/orders/" + encodeURIComponent(order.code) + "/reactivate/"), {method: "POST"}).then(function (res) {
             if (!res.ok) {
                 btn.disabled = false;
                 setMsg(msg, describeError(res.data), "error");
