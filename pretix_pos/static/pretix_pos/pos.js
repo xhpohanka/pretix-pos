@@ -27,6 +27,11 @@
     // there. Always visible as a banner above the map while set.
     var seatOverride = null;
     var currentOrder = null;
+    // Reusing the same promise is important when opening or refreshing the
+    // Find tab races with another view update: rendering an order detail tears
+    // down and rebuilds its seatmap, so two identical GETs look like a full
+    // double reload to the cashier.
+    var orderDetailLoad = null;
     var placementPool = {}; // seat_guid -> seat, pending bulk placement on the loaded order
     // seat_guid -> seat, this order's own seats staged for bulk removal. Removing
     // a seat used to happen on a bare click, which put a destructive action one
@@ -490,6 +495,10 @@
 
     var tabs = Array.prototype.slice.call(document.querySelectorAll(".pos-tab"));
     var activeTab = "quick";
+    // Consumed by refreshCurrentView() after a link/seat explicitly opens one
+    // order. The tab click still refreshes availability and the order list,
+    // but must not fetch the same detail a second time in parallel.
+    var skipNextFindDetailRefresh = false;
     var panels = {
         quick: document.getElementById("pos-tab-quick"),
         sell: document.getElementById("pos-tab-sell"),
@@ -520,9 +529,12 @@
     // panel visibility, default-list load) instead of duplicating it - used
     // when double-clicking an occupied seat on the Sell/Reserve map jumps
     // over to Find order for that seat's order (see renderSeatpick()).
-    function switchToFindOrderTab() {
+    function switchToFindOrderTab(code) {
         var btn = tabs.filter(function (b) { return b.dataset.tab === "find"; })[0];
-        if (btn) btn.click();
+        if (!btn) return;
+        if (code) skipNextFindDetailRefresh = true;
+        btn.click();
+        if (code) loadOrderDetail(code);
     }
 
     function currentSubeventId() {
@@ -903,7 +915,11 @@
             }
             if (activeTab === "find") {
                 var viewLoads = [];
-                if (currentOrder && currentOrder.code) viewLoads.push(loadOrderDetail(currentOrder.code));
+                if (skipNextFindDetailRefresh) {
+                    skipNextFindDetailRefresh = false;
+                } else if (currentOrder && currentOrder.code) {
+                    viewLoads.push(loadOrderDetail(currentOrder.code));
+                }
                 viewLoads.push(searchInput.value.trim() ? doSearch() : loadDefaultOrderList());
                 return Promise.all(viewLoads);
             }
@@ -1520,8 +1536,7 @@
         var el = e.target.closest && e.target.closest("[data-guid]");
         var seat = el && sellSeats.find(function (s) { return s.guid === el.getAttribute("data-guid"); });
         if (!seat || seat.status === "free" || !seat.order_code) return;
-        switchToFindOrderTab();
-        loadOrderDetail(seat.order_code);
+        switchToFindOrderTab(seat.order_code);
     });
 
     function renderCart() {
@@ -1828,8 +1843,7 @@
         link.textContent = order.code;
         link.addEventListener("click", function (e) {
             e.preventDefault();
-            switchToFindOrderTab();
-            loadOrderDetail(order.code);
+            switchToFindOrderTab(order.code);
         });
         sellMsg.appendChild(link);
         sellMsg.appendChild(document.createTextNode(
@@ -2400,8 +2414,7 @@
         link.textContent = result.order.code;
         link.addEventListener("click", function (e) {
             e.preventDefault();
-            switchToFindOrderTab();
-            loadOrderDetail(result.order.code);
+            switchToFindOrderTab(result.order.code);
         });
         quickMsg.appendChild(link);
         quickMsg.appendChild(document.createTextNode(
@@ -2693,7 +2706,10 @@
     }
 
     function loadOrderDetail(code) {
-        return api(eventPath("/orders/" + encodeURIComponent(code) + "/")).then(function (res) {
+        code = String(code);
+        if (orderDetailLoad && orderDetailLoad.code === code) return orderDetailLoad.promise;
+
+        var promise = api(eventPath("/orders/" + encodeURIComponent(code) + "/")).then(function (res) {
             if (!res.ok) {
                 orderDetailEl.hidden = false;
                 orderDetailEl.textContent = describeError(res.data);
@@ -2705,6 +2721,13 @@
             removalPool = {};
             renderOrderDetail();
         });
+        orderDetailLoad = {code: code, promise: promise};
+        promise.then(function () {
+            if (orderDetailLoad && orderDetailLoad.promise === promise) orderDetailLoad = null;
+        }, function () {
+            if (orderDetailLoad && orderDetailLoad.promise === promise) orderDetailLoad = null;
+        });
+        return promise;
     }
 
     // The public API's OrderSerializer has no pending_sum field (unlike the
