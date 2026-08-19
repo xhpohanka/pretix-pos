@@ -3058,11 +3058,14 @@
         }
         if (order.expires && (order.status === "n" || order.status === "e")) {
             var expiry = new Date(order.expires);
-            var expired = order.status === "e" || expiry < new Date();
+            var expired = order.status === "e";
+            var overdue = order.status === "n" && expiry < new Date();
             var line = document.createElement("p");
-            line.className = "pos-expiry" + (expired ? " pos-expiry-past" : "");
+            line.className = "pos-expiry" + (expired || overdue ? " pos-expiry-past" : "");
             line.textContent = expired
                 ? interpolate(gettext("Expired %(date)s - the seats are no longer held"), {date: expiry.toLocaleString()}, true)
+                : overdue
+                ? interpolate(gettext("Payment deadline passed %(date)s - waiting to expire"), {date: expiry.toLocaleString()}, true)
                 : interpolate(gettext("Valid until %(date)s"), {date: expiry.toLocaleString()}, true);
             orderExpiryEl.appendChild(line);
         }
