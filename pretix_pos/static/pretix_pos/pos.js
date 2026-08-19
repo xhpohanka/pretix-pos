@@ -1194,6 +1194,35 @@
         }).length;
     }
 
+    // Server-side quota availability does not include this terminal's own
+    // unsubmitted cart. A quota can cover several products/variants, so count
+    // every queued position consumed by each applicable quota, not just the
+    // exact item the cashier just clicked.
+    function cartUsesQuota(position, quota) {
+        return quota.items.indexOf(position.itemId) !== -1 ||
+            (position.variationId && quota.variations.indexOf(position.variationId) !== -1);
+    }
+
+    function canAddSeatTarget(subeventId, itemId, variationId) {
+        var quotas = quotasFor(subeventId, itemId, variationId);
+        if (!quotas.length) return false;
+        if (!quotas.every(function (quota) {
+            var inCart = cart.filter(function (position) {
+                return position.subeventId === subeventId && cartUsesQuota(position, quota);
+            }).length;
+            return inCart < quota.available_number;
+        })) return false;
+
+        // getAvailableCount() adds the seatplan's physical capacity and
+        // already-reserved seatless positions to the quota limit. Account for
+        // positions of this exact target that are only in the local cart too.
+        var sameTarget = cart.filter(function (position) {
+            return position.subeventId === subeventId && position.itemId === itemId &&
+                position.variationId === (variationId || null);
+        }).length;
+        return sameTarget < getAvailableCount(subeventId, itemId, variationId);
+    }
+
     // The button that turns the mapping off and books this exact product on
     // whatever seat is clicked next. Offered on every sellable product, mapped
     // or not: "seat anything" is the whole point, and a single button per
@@ -1457,6 +1486,10 @@
                     // Saying why beats a dead seat: without this the click just
                     // does nothing and there's no way to guess what's missing.
                     setMsg(seatpickMsg, seatRefusalMessage(s), "error");
+                    return;
+                }
+                if (!canAddSeatTarget(seId, target.itemId, target.variationId || null)) {
+                    setMsg(seatpickMsg, gettext("No free seats left for this item/date."), "error");
                     return;
                 }
                 setMsg(seatpickMsg, "", null);
