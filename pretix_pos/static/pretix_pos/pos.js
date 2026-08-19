@@ -1815,9 +1815,10 @@
     function submitToExistingOrder(mode, selectedOrder, positions, method) {
         return api(eventPath("/orders/" + encodeURIComponent(selectedOrder.code) + "/")).then(function (res) {
             if (!res.ok) return {error: describeError(res.data)};
-            if (res.data.status !== "n" && res.data.status !== "p") {
+            if (!orderCapabilities(res.data).structural) {
                 return {error: gettext("This order can no longer be changed here. Open it in Edit order to handle it.")};
             }
+            if (!confirmStructuralChange(res.data)) return {error: gettext("Order change canceled.")};
             return addQuickPositionsToOrder(res.data, positions).then(function (result) {
                 if (result.error) return result;
                 result.positionsAdded = true;
@@ -2756,6 +2757,33 @@
         return (total - paid + refunded).toFixed(2);
     }
 
+    // Keep POS's editing rules in one place. `expires` deliberately is not
+    // considered here: a pending order still holds capacity until core changes
+    // its status to expired, so a passed payment deadline is not a reason to
+    // make it read-only in the terminal.
+    function orderCapabilities(order) {
+        var live = order.status === "n" || order.status === "p";
+        return {
+            seats: live,
+            structural: live,
+            payment: order.status === "n",
+            refund: live,
+            cancel: live,
+            extend: order.status === "n" || order.status === "e",
+            restore: order.status === "e" || order.status === "c",
+            online: order.sales_channel !== SALES_CHANNEL,
+        };
+    }
+
+    function confirmStructuralChange(order) {
+        var capabilities = orderCapabilities(order);
+        if (!capabilities.structural) return false;
+        if (!capabilities.online) return true;
+        return window.confirm(gettext(
+            "This order was created online. Check the price, payment status, and any invoice before continuing."
+        ));
+    }
+
     function positionLabel(p) {
         var it = itemsById[p.item];
         var name = it ? pickI18n(it.name) : interpolate(gettext("Item #%(id)s"), {id: p.item}, true);
@@ -2775,6 +2803,7 @@
     function renderPositionAdder(subeventId) {
         var wrap = document.createElement("span");
         wrap.className = "pos-add-position";
+        if (!currentOrder || !orderCapabilities(currentOrder).structural) return wrap;
         var disabledMap = subeventDisabled[subeventId] || {items: {}, variations: {}};
         var available = quickOrderableUnits().filter(function (u) {
             var disabled = u.variationId ? disabledMap.variations[u.variationId] : disabledMap.items[u.itemId];
@@ -2866,7 +2895,7 @@
         var cb = document.createElement("input");
         cb.type = "checkbox";
         cb.dataset.positionId = pos.id;
-        cb.disabled = otherDate;
+        cb.disabled = otherDate || !orderCapabilities(currentOrder).seats;
         cb.checked = !otherDate && !pos.seat;
         row.appendChild(cb);
 
@@ -2884,16 +2913,18 @@
         }
         row.appendChild(badge);
 
-        var delMsg = document.createElement("div");
-        delMsg.className = "pos-msg";
-        var delBtn = document.createElement("button");
-        delBtn.type = "button";
-        delBtn.className = "pos-btn-icon pos-btn-icon-danger";
-        delBtn.textContent = "×";
-        delBtn.title = gettext("Cancel this position");
-        delBtn.addEventListener("click", function () { deletePositionFromOrder(pos, delBtn, delMsg); });
-        row.appendChild(delBtn);
-        row.appendChild(delMsg);
+        if (orderCapabilities(currentOrder).structural) {
+            var delMsg = document.createElement("div");
+            delMsg.className = "pos-msg";
+            var delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "pos-btn-icon pos-btn-icon-danger";
+            delBtn.textContent = "×";
+            delBtn.title = gettext("Cancel this position");
+            delBtn.addEventListener("click", function () { deletePositionFromOrder(pos, delBtn, delMsg); });
+            row.appendChild(delBtn);
+            row.appendChild(delMsg);
+        }
 
         return row;
     }
@@ -3019,6 +3050,12 @@
         // Meaningless once an order is paid or canceled - core keeps the date on
         // the row either way, but nothing acts on it anymore.
         orderExpiryEl.innerHTML = "";
+        if (orderCapabilities(order).online) {
+            var sourceWarning = document.createElement("p");
+            sourceWarning.className = "pos-msg pos-error";
+            sourceWarning.textContent = gettext("Online order — changes affect the customer's existing order.");
+            orderExpiryEl.appendChild(sourceWarning);
+        }
         if (order.expires && (order.status === "n" || order.status === "e")) {
             var expiry = new Date(order.expires);
             var expired = order.status === "e" || expiry < new Date();
@@ -3060,7 +3097,7 @@
         // what to do with it - recordRefund() only ever runs on that explicit
         // click, never automatically.
         orderCreditEl.innerHTML = "";
-        if (pending < 0) {
+        if (pending < 0 && orderCapabilities(order).refund) {
             var creditWrap = document.createElement("div");
             creditWrap.className = "pos-credit-banner";
 
@@ -3089,7 +3126,7 @@
         payMethodSelect = null;
         seatHintEl = null;
 
-        if (order.status === "n") {
+        if (orderCapabilities(order).payment) {
             // Method and button belong together on one line - the select is a
             // full-width block by default, which pushed the button onto a line
             // of its own for no reason.
@@ -3177,7 +3214,7 @@
         // back to pending, which is the only way to revive one from here.
         // pretix has no "never expires" - Order.expires can't be null - so the
         // performance the order is for is as long as it can live.
-        if (order.status === "n" || order.status === "e") {
+        if (orderCapabilities(order).extend) {
             var expiryRow = document.createElement("div");
             expiryRow.className = "pos-pay-row";
             var expiryMsg = document.createElement("div");
@@ -3197,7 +3234,7 @@
         }
 
         orderCancelBlockEl.innerHTML = "";
-        if (order.status !== "c") {
+        if (orderCapabilities(order).cancel) {
             var cancelMsg = document.createElement("div");
             cancelMsg.className = "pos-msg";
 
@@ -3310,6 +3347,10 @@
         seatMapPromise.then(function (info) {
             orderSeats = info.results;
             orderSeatmapWrapEl.innerHTML = "";
+            if (!orderCapabilities(currentOrder).seats) {
+                orderSeatmapWrapEl.textContent = gettext("Seats cannot be changed until this order is restored.");
+                return;
+            }
             if (info.noDate) {
                 orderSeatmapWrapEl.textContent = gettext("Choose a date above to place seats for that date.");
                 return;
@@ -3385,6 +3426,7 @@
     }
 
     function extendOrder(order, btn, msg) {
+        if (!orderCapabilities(order).extend) return;
         var date = orderLastEventDate(order);
         if (!date) {
             setMsg(msg, gettext("Can't tell which date this order is for."), "error");
@@ -3412,7 +3454,7 @@
         // Guards the case where this got called despite the button being
         // disabled (stale UI state, a race, or a future call site) - the
         // primary gate is the disabled button in renderOrderDetail().
-        if (!orderIsSeated(order)) return;
+        if (!orderCapabilities(order).payment || !orderIsSeated(order)) return;
 
         var msg = document.createElement("div");
         msg.className = "pos-msg";
@@ -3568,6 +3610,7 @@
     // the whole reason a customer standing at the counter can pay this way at
     // all. The till only counts the money here, not when the QR was shown.
     function confirmBankPayment(order, payment, btn, msg) {
+        if (!orderCapabilities(order).payment) return;
         btn.disabled = true;
         setMsg(msg, gettext("Confirming…"), null);
         api(eventPath("/orders/" + order.code + "/payments/" + payment.local_id + "/confirm/"), {method: "POST"})
@@ -3583,6 +3626,7 @@
     }
 
     function cancelOrder(order, btn, msg) {
+        if (!orderCapabilities(order).cancel) return;
         if (!window.confirm(gettext("Cancel this entire order? This cannot be undone."))) return;
         btn.disabled = true;
         setMsg(msg, gettext("Canceling…"), null);
@@ -3597,8 +3641,10 @@
     }
 
     function deletePositionFromOrder(pos, btn, msg) {
-        if (!window.confirm(gettext("Cancel this position? This cannot be undone."))) return;
         var order = currentOrder;
+        if (!orderCapabilities(order).structural) return;
+        if (!confirmStructuralChange(order)) return;
+        if (!window.confirm(gettext("Cancel this position? This cannot be undone."))) return;
         btn.disabled = true;
         setMsg(msg, gettext("Canceling…"), null);
         api(eventPath("/orders/" + encodeURIComponent(order.code) + "/change/"), {
@@ -3636,6 +3682,8 @@
     // below like any other misplaced seat, no separate recovery path needed.
     function addPositionsToOrder(subeventId, itemId, variationId, count, btn, msg) {
         var order = currentOrder;
+        if (!orderCapabilities(order).structural) return;
+        if (!confirmStructuralChange(order)) return;
         var createPositions = [];
         for (var i = 0; i < count; i++) {
             var p = {item: itemId};
@@ -3702,6 +3750,7 @@
     // is bookkeeping ("we gave the customer X back at the counter"), not an
     // action that moves money itself.
     function recordRefund(order, amount, btn, msg) {
+        if (!orderCapabilities(order).refund) return;
         btn.disabled = true;
         setMsg(msg, gettext("Recording…"), null);
         api(eventPath("/orders/" + order.code + "/refunds/"), {

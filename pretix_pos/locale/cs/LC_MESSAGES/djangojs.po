@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pretix-pos\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-13 15:57+0200\n"
+"POT-Creation-Date: 2026-08-19 23:03+0200\n"
 "PO-Revision-Date: 2026-08-12 12:00+0000\n"
 "Last-Translator: Jan Pohanka\n"
 "Language-Team: Czech\n"
@@ -16,46 +16,49 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:91
 msgid "Cash"
 msgstr "Hotovost"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:92
 msgid "QR transfer"
 msgstr "QR převod"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:93
 msgid "Card"
 msgstr "Karta"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:258
+#: pretix_pos/static/pretix_pos/pos.js:1806
 msgid "Unknown error."
 msgstr "Neznámá chyba."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:297
 msgid ""
 "Unpair this terminal? You will need a new initialization token to reconnect."
 msgstr ""
 "Zrušit spárování tohoto terminálu? Pro opětovné připojení budete potřebovat "
 "nový inicializační token."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:320
+#: pretix_pos/static/pretix_pos/pos.js:1588
 msgid "Total: %(amount)s"
 msgstr "Celkem: %(amount)s"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:381
 msgid "Connecting…"
 msgstr "Připojování…"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:407
+#: pretix_pos/static/pretix_pos/pos.js:439
 msgid "Network error."
 msgstr "Chyba sítě."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:421
 msgid "Checking…"
 msgstr "Kontrola…"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:424
 msgid ""
 "That code doesn't look valid, or this device was revoked - ask an "
 "administrator to re-pair it."
@@ -63,15 +66,16 @@ msgstr ""
 "Tento kód nevypadá platně, nebo bylo toto zařízení zrušeno - požádejte "
 "administrátora o opětovné spárování."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:449
+#: pretix_pos/static/pretix_pos/pos.js:2637
 msgid "Loading…"
 msgstr "Načítání…"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:452
 msgid "Could not load events (%(error)s)."
 msgstr "Nepodařilo se načíst akce (%(error)s)."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:457
 msgid ""
 "This device has no events assigned to it. Ask an administrator to grant it "
 "access on the Devices page."
@@ -79,50 +83,198 @@ msgstr ""
 "Tomuto zařízení nejsou přiřazeny žádné akce. Požádejte administrátora, aby "
 "mu udělil přístup na stránce Zařízení."
 
-#: static/pretix_pos/pos.js
-msgid "Choose a date above."
-msgstr "Vyberte termín výše."
+#: pretix_pos/static/pretix_pos/pos.js:1051
+#: pretix_pos/static/pretix_pos/pos.js:1057
+msgid "Could not load the seating plan. Selling is temporarily unavailable."
+msgstr ""
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1136
+#: pretix_pos/static/pretix_pos/pos.js:2028
 msgid "No items available."
 msgstr "Nejsou k dispozici žádné položky."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1176
+msgid "%(count)s product with no seats in this plan"
+msgid_plural "%(count)s products with no seats in this plan"
+msgstr[0] "%(count)s produkt bez míst v tomto plánu"
+msgstr[1] "%(count)s produkty bez míst v tomto plánu"
+msgstr[2] "%(count)s produktů bez míst v tomto plánu"
+
+#: pretix_pos/static/pretix_pos/pos.js:1257
+msgid "Placing this — click seats"
+msgstr "Usazuji tento — klikejte do mapy"
+
+#: pretix_pos/static/pretix_pos/pos.js:1259
+msgid "Seat this product (%(count)s)"
+msgstr "Usadit tento produkt (%(count)s)"
+
+#: pretix_pos/static/pretix_pos/pos.js:1260
+msgid "Seat this product"
+msgstr "Usadit tento produkt"
+
+#: pretix_pos/static/pretix_pos/pos.js:1284
 msgid "%(name)s (%(price)s) — seated"
 msgstr "%(name)s (%(price)s) — se sezením"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1296
+#: pretix_pos/static/pretix_pos/pos.js:1329
 msgid "%(count)s selected"
 msgid_plural "%(count)s selected"
 msgstr[0] "Vybráno: %(count)s"
 msgstr[1] "Vybráno: %(count)s"
 msgstr[2] "Vybráno: %(count)s"
 
-#: static/pretix_pos/pos.js
-msgid "Pick seats below"
-msgstr "Vyberte místa níže"
+#: pretix_pos/static/pretix_pos/pos.js:1297
+msgid "Click its seats on the map"
+msgstr "Klikejte na jeho místa v mapě"
 
-#: static/pretix_pos/pos.js
-msgid "Switch to this item (%(count)s)"
-msgstr "Přepnout na tuto položku (%(count)s)"
+#: pretix_pos/static/pretix_pos/pos.js:1309
+msgid "%(name)s — seated, pick a variant"
+msgstr "%(name)s — se sezením, vyberte variantu"
 
-#: static/pretix_pos/pos.js
-msgid "Switch to this item"
-msgstr "Přepnout na tuto položku"
+#: pretix_pos/static/pretix_pos/pos.js:1433
+msgid ""
+"This seat's category has no product mapped to it - choose a product with "
+"“Seat this product” first."
+msgstr ""
+"Kategorie tohoto místa nemá namapovanou žádnou položku – zvolte nejdřív "
+"produkt tlačítkem „Usadit tento produkt“."
 
-#: static/pretix_pos/pos.js
-msgid "Seats for: %(name)s"
-msgstr "Místa pro: %(name)s"
+#: pretix_pos/static/pretix_pos/pos.js:1438
+msgid ""
+"%(name)s has variants, so a seat can't tell which one - pick the variant "
+"with “Seat this product” first."
+msgstr ""
+"%(name)s má varianty, takže z místa nelze poznat kterou – vyberte nejdřív "
+"variantu tlačítkem „Usadit tento produkt“."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1442
+msgid "This seat can't be booked from here."
+msgstr "Toto místo odsud nelze obsadit."
+
+#: pretix_pos/static/pretix_pos/pos.js:1456
+msgid "Placing: %(name)s - the seating plan's own mapping is ignored"
+msgstr "Usazuji: %(name)s – mapování plánu se ignoruje"
+
+#: pretix_pos/static/pretix_pos/pos.js:1461
+msgid "Back to the mapping"
+msgstr "Zpět na mapování"
+
+#: pretix_pos/static/pretix_pos/pos.js:1508
+#: pretix_pos/static/pretix_pos/pos.js:3715
+msgid "No free seats left for this item/date."
+msgstr "Pro tuto položku/termín nezbývá žádné volné místo."
+
+#: pretix_pos/static/pretix_pos/pos.js:1545
 msgid "Empty."
 msgstr "Prázdný."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1571
 msgid "Remove"
 msgstr "Odebrat"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1651
+msgid ""
+"Could not match every seat to its position - assign the missing ones in the "
+"Edit order tab."
+msgstr ""
+"Nepodařilo se přiřadit každé místo k jeho pozici – zbytek přiřaďte v záložce "
+"Upravit objednávku."
+
+#: pretix_pos/static/pretix_pos/pos.js:1659
+msgid ""
+"The order was created, but %(count)s seat(s) could not be assigned (%"
+"(error)s) - finish it in the Edit order tab."
+msgstr ""
+"Objednávka byla vytvořena, ale %(count)s míst se nepodařilo přiřadit (%"
+"(error)s) – dokončete to v záložce Upravit objednávku."
+
+#: pretix_pos/static/pretix_pos/pos.js:1673
+#: pretix_pos/static/pretix_pos/pos.js:2301
+msgid "Searching existing reservations…"
+msgstr "Vyhledávání existujících rezervací…"
+
+#: pretix_pos/static/pretix_pos/pos.js:1678
+#: pretix_pos/static/pretix_pos/pos.js:2306
+msgid "Couldn't check existing reservations. Try again before reserving."
+msgstr ""
+"Nepodařilo se ověřit existující rezervace. Zkuste to před rezervací znovu."
+
+#: pretix_pos/static/pretix_pos/pos.js:1685
+#: pretix_pos/static/pretix_pos/pos.js:2313
+msgid "Will add the selected tickets to order "
+msgstr "Vybrané vstupenky budou přidány do objednávky "
+
+#: pretix_pos/static/pretix_pos/pos.js:1690
+#: pretix_pos/static/pretix_pos/pos.js:2318
+msgid "The customer details on that order will not be changed."
+msgstr "Údaje zákazníka v této objednávce se nezmění."
+
+#: pretix_pos/static/pretix_pos/pos.js:1692
+msgid "Will create a new order."
+msgstr "Bude vytvořena nová objednávka."
+
+#: pretix_pos/static/pretix_pos/pos.js:1697
+#: pretix_pos/static/pretix_pos/pos.js:2325
+msgid "Change"
+msgstr "Změnit"
+
+#: pretix_pos/static/pretix_pos/pos.js:1711
+#: pretix_pos/static/pretix_pos/pos.js:2339
+msgid "Matching orders found. Choose what to do:"
+msgstr "Nalezeny odpovídající objednávky. Zvolte, co provést:"
+
+#: pretix_pos/static/pretix_pos/pos.js:1715
+msgid "Create a new order"
+msgstr "Vytvořit novou objednávku"
+
+#: pretix_pos/static/pretix_pos/pos.js:1725
+#: pretix_pos/static/pretix_pos/pos.js:2353
+msgid "Add to %(code)s (%(customer)s, %(count)s tickets, %(status)s)"
+msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek, %(status)s)"
+
+#: pretix_pos/static/pretix_pos/pos.js:1729
+#: pretix_pos/static/pretix_pos/pos.js:2357
+msgid "paid"
+msgstr "zaplaceno"
+
+#: pretix_pos/static/pretix_pos/pos.js:1729
+#: pretix_pos/static/pretix_pos/pos.js:2357
+msgid "pending"
+msgstr "čeká na úhradu"
+
+#: pretix_pos/static/pretix_pos/pos.js:1783
+msgid "This order still needs seats before it can be sold."
+msgstr "Tato objednávka ještě potřebuje usadit, než ji lze prodat."
+
+#: pretix_pos/static/pretix_pos/pos.js:1819
+#: pretix_pos/static/pretix_pos/pos.js:2471
+msgid ""
+"This order can no longer be changed here. Open it in Edit order to handle it."
+msgstr ""
+"Tuto objednávku už zde nelze upravit. Otevřete ji v záložce Upravit "
+"objednávku."
+
+#: pretix_pos/static/pretix_pos/pos.js:1821
+msgid "Order change canceled."
+msgstr "Změna objednávky byla zrušena."
+
+#: pretix_pos/static/pretix_pos/pos.js:1840
+msgid "Sold — order "
+msgstr "Prodáno — objednávka "
+
+#: pretix_pos/static/pretix_pos/pos.js:1840
+#: pretix_pos/static/pretix_pos/pos.js:2412
+msgid "Reserved — order "
+msgstr "Rezervováno — objednávka "
+
+#: pretix_pos/static/pretix_pos/pos.js:1851
+#: pretix_pos/static/pretix_pos/pos.js:2424
+msgid ", total %(total)s."
+msgstr ", celkem %(total)s."
+
+#: pretix_pos/static/pretix_pos/pos.js:1866
+#: pretix_pos/static/pretix_pos/pos.js:2440
 msgid ""
 "Enter an e-mail or a name before reserving - otherwise there's no way to "
 "find this order again later."
@@ -130,448 +282,8 @@ msgstr ""
 "Před rezervací zadejte e-mail nebo jméno - jinak nebude možné tuto "
 "objednávku později znovu najít."
 
-#: static/pretix_pos/pos.js
-msgid "Submitting…"
-msgstr "Odesílání…"
-
-#: static/pretix_pos/pos.js
-msgid "Reserved — order "
-msgstr "Rezervováno — objednávka "
-
-#: static/pretix_pos/pos.js
-msgid "Sold — order "
-msgstr "Prodáno — objednávka "
-
-#: static/pretix_pos/pos.js
-msgid ", total %(total)s."
-msgstr ", celkem %(total)s."
-
-#: static/pretix_pos/pos.js
-msgid ", total %(total)s - but couldn't release every placeholder seat, check the Edit order tab."
-msgstr ", celkem %(total)s - ale nepodařilo se uvolnit všechna zástupná místa, zkontrolujte záložku Upravit objednávku."
-
-#: static/pretix_pos/pos.js
-msgid "Searching existing reservations…"
-msgstr "Vyhledávání existujících rezervací…"
-
-#: static/pretix_pos/pos.js
-msgid "Couldn't check existing reservations. Try again before reserving."
-msgstr "Nepodařilo se ověřit existující rezervace. Zkuste to před rezervací znovu."
-
-#: static/pretix_pos/pos.js
-msgid "Will add the selected tickets to order "
-msgstr "Vybrané vstupenky budou přidány do objednávky "
-
-#: static/pretix_pos/pos.js
-msgid "The customer details on that order will not be changed."
-msgstr "Údaje zákazníka v této objednávce se nezmění."
-
-#: static/pretix_pos/pos.js
-msgid "Will create a new reservation."
-msgstr "Bude vytvořena nová rezervace."
-
-#: static/pretix_pos/pos.js
-msgid "Will create a new order."
-msgstr "Bude vytvořena nová objednávka."
-
-#: static/pretix_pos/pos.js
-msgid "Change"
-msgstr "Změnit"
-
-#: static/pretix_pos/pos.js
-msgid "Matching pending reservations found. Choose what to do:"
-msgstr "Nalezeny odpovídající čekající rezervace. Zvolte, co provést:"
-
-#: static/pretix_pos/pos.js
-msgid "Matching orders found. Choose what to do:"
-msgstr "Nalezeny odpovídající objednávky. Zvolte, co provést:"
-
-#: static/pretix_pos/pos.js
-msgid "Create a new reservation"
-msgstr "Vytvořit novou rezervaci"
-
-#: static/pretix_pos/pos.js
-msgid "Create a new order"
-msgstr "Vytvořit novou objednávku"
-
-#: static/pretix_pos/pos.js
-msgid "Add to %(code)s (%(customer)s, %(count)s tickets)"
-msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek)"
-
-#: static/pretix_pos/pos.js
-msgid "Add to %(code)s (%(customer)s, %(count)s tickets, %(status)s)"
-msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek, %(status)s)"
-
-#: static/pretix_pos/pos.js
-msgid "paid"
-msgstr "zaplaceno"
-
-#: static/pretix_pos/pos.js
-msgid "pending"
-msgstr "čeká na úhradu"
-
-#: static/pretix_pos/pos.js
-msgid "Wait for the existing-reservation search before reserving."
-msgstr "Před rezervací počkejte na dokončení vyhledávání existujících rezervací."
-
-#: static/pretix_pos/pos.js
-msgid "Couldn't check existing reservations. Correct the customer details or try again."
-msgstr "Nepodařilo se ověřit existující rezervace. Upravte údaje zákazníka nebo to zkuste znovu."
-
-#: static/pretix_pos/pos.js
-msgid "Choose whether to create a new reservation or add to an existing one."
-msgstr "Zvolte, zda vytvořit novou rezervaci, nebo přidat vstupenky do existující."
-
-#: static/pretix_pos/pos.js
-msgid "This order is no longer pending. Open it in Edit order to handle it."
-msgstr "Tato objednávka už nečeká na vyřízení. Otevřete ji v záložce Upravit objednávku."
-
-#: static/pretix_pos/pos.js
-msgid "This order can no longer be changed here. Open it in Edit order to handle it."
-msgstr "Tuto objednávku už zde nelze upravit. Otevřete ji v záložce Upravit objednávku."
-
-#: static/pretix_pos/pos.js
-msgid "Use Sell now to add tickets to an already paid order, so any difference can be charged immediately."
-msgstr "Pro přidání vstupenek do už zaplacené objednávky použijte Prodat nyní, aby se případný rozdíl ihned uhradil."
-
-#: static/pretix_pos/pos.js
-msgid "This order still needs seats before it can be sold."
-msgstr "Tato objednávka ještě potřebuje usadit, než ji lze prodat."
-
-#: static/pretix_pos/pos.js
-msgid "This order has no outstanding amount to charge."
-msgstr "Tato objednávka nemá žádnou zbývající částku k úhradě."
-
-#: static/pretix_pos/pos.js
-msgid "Some temporary seats could not be released. Check the order in Edit order."
-msgstr "Některá dočasně obsazená místa se nepodařilo uvolnit. Zkontrolujte objednávku v záložce Upravit objednávku."
-
-#: static/pretix_pos/pos.js
-msgid "Sold — order %(code)s, total %(total)s."
-msgstr "Prodáno — objednávka %(code)s, celkem %(total)s."
-
-#: static/pretix_pos/pos.js
-msgid "Reserved — order %(code)s, total %(total)s."
-msgstr "Rezervováno — objednávka %(code)s, celkem %(total)s."
-
-#: static/pretix_pos/pos.js
-msgid "No dates available."
-msgstr "Nejsou k dispozici žádné termíny."
-
-#: static/pretix_pos/pos.js
-msgid "Date"
-msgstr "Termín"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Not enough free seats left for one of these dates/items - try a smaller "
-"quantity."
-msgstr ""
-"Pro některou z těchto položek/termínů už není dostatek volných míst - zkuste "
-"menší počet."
-
-#: static/pretix_pos/pos.js
-msgid "Enter a quantity greater than zero for at least one item/date."
-msgstr "Zadejte počet větší než nula alespoň pro jednu položku/termín."
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Reserved — order %(code)s, total %(total)s - but couldn't release every "
-"placeholder seat, check the Edit order tab."
-msgstr ""
-"Rezervováno — objednávka %(code)s, celkem %(total)s - ale nepodařilo se "
-"uvolnit všechna zástupná místa, zkontrolujte záložku Upravit objednávku."
-
-#: static/pretix_pos/pos.js
-msgid "Searching…"
-msgstr "Vyhledávání…"
-
-#: static/pretix_pos/pos.js
-msgid "no e-mail"
-msgstr "bez e-mailu"
-
-#: static/pretix_pos/pos.js
-msgid "No matching orders."
-msgstr "Žádné odpovídající objednávky."
-
-#: static/pretix_pos/pos.js
-msgid "total %(total)s"
-msgstr "celkem %(total)s"
-
-#: static/pretix_pos/pos.js
-msgid "pending %(amount)s"
-msgstr "čeká na úhradu %(amount)s"
-
-#: static/pretix_pos/pos.js
-msgid "credit %(amount)s"
-msgstr "dluh %(amount)s"
-
-#: static/pretix_pos/pos.js
-msgid "Item #%(id)s"
-msgstr "Položka č. %(id)s"
-
-#: static/pretix_pos/pos.js
-msgid "Add a ticket"
-msgstr "Přidat vstupenku"
-
-#: static/pretix_pos/pos.js
-msgid "no seat"
-msgstr "bez místa"
-
-#: static/pretix_pos/pos.js
-msgid "Cancel this position"
-msgstr "Zrušit tuto pozici"
-
-#: static/pretix_pos/pos.js
-msgid "Click to switch to this date's seating plan."
-msgstr "Kliknutím přepnete na plán sezení tohoto termínu."
-
-#: static/pretix_pos/pos.js
-msgid "Total: %(total)s"
-msgstr "Celkem: %(total)s"
-
-#: static/pretix_pos/pos.js
-msgid " — pending: %(amount)s"
-msgstr " — čeká na úhradu: %(amount)s"
-
-#: static/pretix_pos/pos.js
-msgid " — credit owed to customer: %(amount)s"
-msgstr " — dluh vůči zákazníkovi: %(amount)s"
-
-#: static/pretix_pos/pos.js
-msgid " — fully paid"
-msgstr " — plně uhrazeno"
-
-#: static/pretix_pos/pos.js
-msgid "Record a refund"
-msgstr "Zaznamenat vrácení"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Only records that the money was returned to the customer - this does not "
-"move any money itself."
-msgstr ""
-"Pouze zaznamená, že peníze byly zákazníkovi vráceny - terminál sám žádné "
-"peníze nepřevádí."
-
-#: static/pretix_pos/pos.js
-msgid "Take payment"
-msgstr "Přijmout platbu"
-
-#: static/pretix_pos/pos.js
-msgid "Assign a seat to every position (for every date) before taking payment."
-msgstr ""
-"Před přijetím platby přiřaďte místo ke každé pozici (pro každý termín)."
-
-#: static/pretix_pos/pos.js
-msgid "Cancel entire order"
-msgstr "Zrušit celou objednávku"
-
-#: static/pretix_pos/pos.js
-msgid "Choose a date above to place seats for that date."
-msgstr "Vyberte termín výše, abyste mohli pro tento termín přiřazovat místa."
-
-#: static/pretix_pos/pos.js
-msgid "This date has no seated positions."
-msgstr "Tento termín nemá žádné pozice se sezením."
-
-#: static/pretix_pos/pos.js
-msgid ""
-"This order's own seats (for the date selected above) are shown in a muted "
-"highlight color. Click a free seat (or drag a rectangle over several) to "
-"select up to as many as there are checked positions - shown with a ring only "
-"until you click \"Place selected\"; click empty space to clear that "
-"selection. Click one of this order's own seats to remove it. Drag one of "
-"this order's own seats onto a free seat to move it (shown as a translucent "
-"preview while dragging); hold Ctrl while dragging to move its whole block of "
-"seats together. Hover any occupied seat to see which order holds it, or "
-"double-click it to jump straight to that order. Positions for other dates "
-"are listed above, greyed out - switch the date to work with them."
-msgstr ""
-"Vlastní místa této objednávky (pro termín vybraný výše) jsou zobrazena "
-"tlumenou zvýrazňující barvou. Kliknutím na volné místo (nebo přetažením "
-"obdélníku přes několik míst) vyberete až tolik míst, kolik je zaškrtnutých "
-"pozic - zobrazí se pouze s obrysem, dokud neklikněte na „Přiřadit vybraná“; "
-"kliknutím na prázdné místo výběr zrušíte. Kliknutím na některé z vlastních "
-"míst této objednávky ho odeberete. Přetažením některého z vlastních míst "
-"této objednávky na volné místo ho přesunete (během přetahování se zobrazí "
-"poloprůhledný náhled); podržením klávesy Ctrl při přetahování přesunete celý "
-"blok míst najednou. Najetím myší na obsazené místo zjistíte, které "
-"objednávce patří, nebo na něj dvakrát klikněte a přejděte přímo na danou "
-"objednávku. Pozice pro ostatní termíny jsou uvedeny výše, zešedlé - pro "
-"práci s nimi přepněte termín."
-
-#: static/pretix_pos/pos.js
-msgid "Place selected seats on checked positions"
-msgstr "Přiřadit vybraná místa k zaškrtnutým pozicím"
-
-#: static/pretix_pos/pos.js
-msgid "Charging…"
-msgstr "Zpracování platby…"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Could not cancel %(count)s pending payment, continuing anyway: %(errors)s"
-msgid_plural ""
-"Could not cancel %(count)s pending payments, continuing anyway: %(errors)s"
-msgstr[0] ""
-"Nepodařilo se zrušit %(count)s čekající platbu, pokračuji dále: %(errors)s"
-msgstr[1] ""
-"Nepodařilo se zrušit %(count)s čekající platby, pokračuji dále: %(errors)s"
-msgstr[2] ""
-"Nepodařilo se zrušit %(count)s čekajících plateb, pokračuji dále: %(errors)s"
-
-#: static/pretix_pos/pos.js
-msgid "Cancel this entire order? This cannot be undone."
-msgstr "Zrušit celou tuto objednávku? Tuto akci nelze vzít zpět."
-
-#: static/pretix_pos/pos.js
-msgid "Canceling…"
-msgstr "Rušení…"
-
-#: static/pretix_pos/pos.js
-msgid "Cancel this position? This cannot be undone."
-msgstr "Zrušit tuto pozici? Tuto akci nelze vzít zpět."
-
-#: static/pretix_pos/pos.js
-msgid "Adding…"
-msgstr "Přidávání…"
-
-#: static/pretix_pos/pos.js
-msgid "No free seats left for this item/date."
-msgstr "Pro tuto položku/termín nezbývá žádné volné místo."
-
-#: static/pretix_pos/pos.js
-msgid "Recording…"
-msgstr "Zaznamenávání…"
-
-#: static/pretix_pos/pos.js
-msgid "%(n)s selected seat"
-msgid_plural "%(n)s selected seats"
-msgstr[0] "%(n)s vybrané místo"
-msgstr[1] "%(n)s vybraná místa"
-msgstr[2] "%(n)s vybraných míst"
-
-#: static/pretix_pos/pos.js
-msgid "%(n)s checked position"
-msgid_plural "%(n)s checked positions"
-msgstr[0] "%(n)s zaškrtnutá pozice"
-msgstr[1] "%(n)s zaškrtnuté pozice"
-msgstr[2] "%(n)s zaškrtnutých pozic"
-
-#: static/pretix_pos/pos.js
-msgid "Place %(seats)s on %(positions)s"
-msgstr "Přiřadit %(seats)s na %(positions)s"
-
-#: static/pretix_pos/pos.js
-msgid "Placing %(n)s seat…"
-msgid_plural "Placing %(n)s seats…"
-msgstr[0] "Přiřazuje se %(n)s místo…"
-msgstr[1] "Přiřazují se %(n)s místa…"
-msgstr[2] "Přiřazuje se %(n)s míst…"
-
-#: static/pretix_pos/pos.js
-msgid "Placed %(n)s seat."
-msgid_plural "Placed %(n)s seats."
-msgstr[0] "Přiřazeno %(n)s místo."
-msgstr[1] "Přiřazena %(n)s místa."
-msgstr[2] "Přiřazeno %(n)s míst."
-
-#: static/pretix_pos/pos.js
-msgid "Batch placement failed (%(error)s) - retrying one by one…"
-msgstr "Hromadné přiřazení selhalo (%(error)s) - zkouší se jednotlivě…"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Placing seats one by one - this is not a single atomic action, a failure "
-"partway through leaves earlier placements in place…"
-msgstr ""
-"Místa se přiřazují postupně jedno po druhém - nejde o jedinou atomickou "
-"akci, selhání uprostřed ponechá dřívější přiřazení v platnosti…"
-
-#: static/pretix_pos/pos.js
-msgid "Placed %(ok)s/%(n)s seat."
-msgid_plural "Placed %(ok)s/%(n)s seats."
-msgstr[0] "Přiřazeno %(ok)s/%(n)s místo."
-msgstr[1] "Přiřazena %(ok)s/%(n)s místa."
-msgstr[2] "Přiřazeno %(ok)s/%(n)s míst."
-
-#: static/pretix_pos/pos.js
-msgid "Failed: %(errors)s"
-msgstr "Selhalo: %(errors)s"
-
-#: static/pretix_pos/pos.js
-msgid "Moving seat…"
-msgstr "Přesouvání místa…"
-
-#: static/pretix_pos/pos.js
-msgid "Seat moved."
-msgstr "Místo přesunuto."
-
-#: static/pretix_pos/pos.js
-msgid "Removing seat…"
-msgstr "Odebírání místa…"
-
-#: static/pretix_pos/pos.js
-msgid "Seat removed."
-msgstr "Místo odebráno."
-
-#: static/pretix_pos/pos.js
-msgid "Cannot move block: a seat's location is unknown."
-msgstr "Blok nelze přesunout: poloha místa není známá."
-
-#: static/pretix_pos/pos.js
-msgid "Cannot move block: target position is outside the seating plan."
-msgstr "Blok nelze přesunout: cílová pozice je mimo plán sezení."
-
-#: static/pretix_pos/pos.js
-msgid "Cannot move block: seat at the target position is already taken."
-msgstr "Blok nelze přesunout: místo na cílové pozici je již obsazené."
-
-#: static/pretix_pos/pos.js
-msgid "Cannot move block: target seats overlap."
-msgstr "Blok nelze přesunout: cílová místa se překrývají."
-
-#: static/pretix_pos/pos.js
-msgid "Moving %(n)s seat…"
-msgid_plural "Moving %(n)s seats…"
-msgstr[0] "Přesouvá se %(n)s místo…"
-msgstr[1] "Přesouvají se %(n)s místa…"
-msgstr[2] "Přesouvá se %(n)s míst…"
-
-#: static/pretix_pos/pos.js
-msgid "Batch move failed (%(error)s) - retrying one by one…"
-msgstr "Hromadný přesun selhal (%(error)s) - zkouší se jednotlivě…"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"Moving %(n)s seat - this is not a single atomic action, a failure partway "
-"through leaves it partially done…"
-msgid_plural ""
-"Moving %(n)s seats - this is not a single atomic action, a failure partway "
-"through leaves it partially done…"
-msgstr[0] ""
-"Přesouvá se %(n)s místo - nejde o jedinou atomickou akci, selhání uprostřed "
-"ponechá akci částečně dokončenou…"
-msgstr[1] ""
-"Přesouvají se %(n)s místa - nejde o jedinou atomickou akci, selhání "
-"uprostřed ponechá akci částečně dokončenou…"
-msgstr[2] ""
-"Přesouvá se %(n)s míst - nejde o jedinou atomickou akci, selhání uprostřed "
-"ponechá akci částečně dokončenou…"
-
-#: static/pretix_pos/pos.js
-msgid "Block moved."
-msgstr "Blok přesunut."
-
-#: static/pretix_pos/pos.js
-msgid "Some seats failed to move: %(error)s"
-msgstr "Některá místa se nepodařilo přesunout: %(error)s"
-
-#~ msgid "Add a ticket for this date"
-#~ msgstr "Přidat vstupenku na tento termín"
-
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1878
+#: pretix_pos/static/pretix_pos/pos.js:2444
 msgid ""
 "Can't reach the server to check whether this event is in test mode - reload "
 "the page before selling."
@@ -579,28 +291,227 @@ msgstr ""
 "Nelze u serveru ověřit, zda je akce v testovacím režimu – před prodejem "
 "načtěte stránku znovu."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:1882
+#: pretix_pos/static/pretix_pos/pos.js:2448
+msgid "Wait for the existing-reservation search before reserving."
+msgstr ""
+"Před rezervací počkejte na dokončení vyhledávání existujících rezervací."
+
+#: pretix_pos/static/pretix_pos/pos.js:1886
+#: pretix_pos/static/pretix_pos/pos.js:2452
+msgid ""
+"Couldn't check existing reservations. Correct the customer details or try "
+"again."
+msgstr ""
+"Nepodařilo se ověřit existující rezervace. Upravte údaje zákazníka nebo to "
+"zkuste znovu."
+
+#: pretix_pos/static/pretix_pos/pos.js:1890
+#: pretix_pos/static/pretix_pos/pos.js:2456
+msgid "Choose whether to create a new reservation or add to an existing one."
+msgstr ""
+"Zvolte, zda vytvořit novou rezervaci, nebo přidat vstupenky do existující."
+
+#: pretix_pos/static/pretix_pos/pos.js:1896
+#: pretix_pos/static/pretix_pos/pos.js:2461
+msgid "Submitting…"
+msgstr "Odesílání…"
+
+#: pretix_pos/static/pretix_pos/pos.js:1914
+msgid ""
+"Some temporary seats could not be released. Check the order in Edit order."
+msgstr ""
+"Některá dočasně obsazená místa se nepodařilo uvolnit. Zkontrolujte "
+"objednávku v záložce Upravit objednávku."
+
+#: pretix_pos/static/pretix_pos/pos.js:2035
+msgid "No dates available."
+msgstr "Nejsou k dispozici žádné termíny."
+
+#: pretix_pos/static/pretix_pos/pos.js:2045
+msgid "Date"
+msgstr "Termín"
+
+#: pretix_pos/static/pretix_pos/pos.js:2109
 msgid "Decrease quantity"
 msgstr "Snížit počet"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:2111
 msgid "Increase quantity"
 msgstr "Zvýšit počet"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:2240
+#: pretix_pos/static/pretix_pos/pos.js:2273
+msgid ""
+"Not enough free seats left for one of these dates/items - try a smaller "
+"quantity."
+msgstr ""
+"Pro některou z těchto položek/termínů už není dostatek volných míst - zkuste "
+"menší počet."
+
+#: pretix_pos/static/pretix_pos/pos.js:2320
+msgid "Will create a new reservation."
+msgstr "Bude vytvořena nová rezervace."
+
+#: pretix_pos/static/pretix_pos/pos.js:2343
+msgid "Create a new reservation"
+msgstr "Vytvořit novou rezervaci"
+
+#: pretix_pos/static/pretix_pos/pos.js:2423
+msgid ""
+", total %(total)s - but couldn't release every placeholder seat, check the "
+"Edit order tab."
+msgstr ""
+", celkem %(total)s - ale nepodařilo se uvolnit všechna zástupná místa, "
+"zkontrolujte záložku Upravit objednávku."
+
+#: pretix_pos/static/pretix_pos/pos.js:2431
+msgid "Enter a quantity greater than zero for at least one item/date."
+msgstr "Zadejte počet větší než nula alespoň pro jednu položku/termín."
+
+#: pretix_pos/static/pretix_pos/pos.js:2562
+msgid "Searching…"
+msgstr "Vyhledávání…"
+
+#: pretix_pos/static/pretix_pos/pos.js:2656
+msgid "no e-mail"
+msgstr "bez e-mailu"
+
+#: pretix_pos/static/pretix_pos/pos.js:2672
+msgid "No matching orders."
+msgstr "Žádné odpovídající objednávky."
+
+#: pretix_pos/static/pretix_pos/pos.js:2693
+msgid "total %(total)s"
+msgstr "celkem %(total)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:2695
+msgid "pending %(amount)s"
+msgstr "čeká na úhradu %(amount)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:2701
+msgid "credit %(amount)s"
+msgstr "dluh %(amount)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:2783
+msgid ""
+"This order was created online. Check the price, payment status, and any "
+"invoice before continuing."
+msgstr ""
+"Tato objednávka byla vytvořena online. Před pokračováním zkontrolujte cenu, "
+"stav platby a případnou fakturu."
+
+#: pretix_pos/static/pretix_pos/pos.js:2789
+msgid "Item #%(id)s"
+msgstr "Položka č. %(id)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:2819
+msgid "Add a ticket"
+msgstr "Přidat vstupenku"
+
+#: pretix_pos/static/pretix_pos/pos.js:2868
+msgid "Add"
+msgstr ""
+
+#: pretix_pos/static/pretix_pos/pos.js:2912
+msgid "no seat"
+msgstr "bez místa"
+
+#: pretix_pos/static/pretix_pos/pos.js:2923
+msgid "Cancel this position"
+msgstr "Zrušit tuto pozici"
+
+#: pretix_pos/static/pretix_pos/pos.js:2973
+msgid "Click to switch to this date's seating plan."
+msgstr "Kliknutím přepnete na plán sezení tohoto termínu."
+
+#: pretix_pos/static/pretix_pos/pos.js:3040
+msgid "Total: %(total)s"
+msgstr "Celkem: %(total)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3041
+msgid " — pending: %(amount)s"
+msgstr " — čeká na úhradu: %(amount)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3042
+msgid " — credit owed to customer: %(amount)s"
+msgstr " — dluh vůči zákazníkovi: %(amount)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3043
+msgid " — fully paid"
+msgstr " — plně uhrazeno"
+
+#: pretix_pos/static/pretix_pos/pos.js:3056
+msgid "Online order — changes affect the customer's existing order."
+msgstr "Online objednávka — změny ovlivní stávající objednávku zákazníka."
+
+#: pretix_pos/static/pretix_pos/pos.js:3065
+msgid "Expired %(date)s - the seats are no longer held"
+msgstr "Propadlo %(date)s – místa už nejsou držena"
+
+#: pretix_pos/static/pretix_pos/pos.js:3066
+msgid "Valid until %(date)s"
+msgstr "Platí do %(date)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3081
+msgid "Paid %(amount)s by %(method)s on %(date)s"
+msgstr "Zaplaceno %(amount)s – %(method)s, %(date)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3107
+msgid "Record a refund"
+msgstr "Zaznamenat vrácení"
+
+#: pretix_pos/static/pretix_pos/pos.js:3108
+msgid ""
+"Only records that the money was returned to the customer - this does not "
+"move any money itself."
+msgstr ""
+"Pouze zaznamená, že peníze byly zákazníkovi vráceny - terminál sám žádné "
+"peníze nepřevádí."
+
+#: pretix_pos/static/pretix_pos/pos.js:3149
+msgid "Take payment"
+msgstr "Přijmout platbu"
+
+#: pretix_pos/static/pretix_pos/pos.js:3155
+msgid "Assign a seat to every position (for every date) before taking payment."
+msgstr ""
+"Před přijetím platby přiřaďte místo ke každé pozici (pro každý termín)."
+
+#: pretix_pos/static/pretix_pos/pos.js:3174
+msgid "Show QR code"
+msgstr "Zobrazit QR kód"
+
+#: pretix_pos/static/pretix_pos/pos.js:3190
+msgid "Payment received"
+msgstr "Platba dorazila"
+
+#: pretix_pos/static/pretix_pos/pos.js:3227
+msgid "Revive until the event date"
+msgstr "Obnovit do konání akce"
+
+#: pretix_pos/static/pretix_pos/pos.js:3228
+msgid "Extend to the event date"
+msgstr "Prodloužit do konání akce"
+
+#: pretix_pos/static/pretix_pos/pos.js:3245
+msgid "Cancel entire order"
+msgstr "Zrušit celou objednávku"
+
+#: pretix_pos/static/pretix_pos/pos.js:3310
 msgid ""
 "This order's own seats (for the date selected above) are shown in a muted "
-"highlight color. What clicking does depends on the checkboxes in the position "
-"list: with positions checked you are placing seats, so clicks and rectangle "
-"drags pick free seats; with nothing checked you are clearing seats, so they "
-"pick this order's own seats instead. Either way the selection is only staged "
-"- shown with a ring - until you press the button next to the legend, and "
-"clicking empty space clears it. Drag one of this order's own seats onto a "
-"free seat to move it (shown as a translucent preview while dragging); hold "
-"Ctrl while dragging to move its whole block of seats together. Hover any "
-"occupied seat to see which order holds it, or double-click it to jump "
-"straight to that order. Positions for other dates are listed above, greyed "
-"out - switch the date to work with them."
+"highlight color. What clicking does depends on the checkboxes in the "
+"position list: with positions checked you are placing seats, so clicks and "
+"rectangle drags pick free seats; with nothing checked you are clearing "
+"seats, so they pick this order's own seats instead. Either way the selection "
+"is only staged - shown with a ring - until you press the button next to the "
+"legend, and clicking empty space clears it. Drag one of this order's own "
+"seats onto a free seat to move it (shown as a translucent preview while "
+"dragging); hold Ctrl while dragging to move its whole block of seats "
+"together. Hover any occupied seat to see which order holds it, or double-"
+"click it to jump straight to that order. Positions for other dates are "
+"listed above, greyed out - switch the date to work with them."
 msgstr ""
 "Vlastní místa této objednávky (pro termín vybraný výše) jsou zobrazena "
 "tlumenou zvýrazňující barvou. Co udělá kliknutí, závisí na zaškrtávátkách v "
@@ -616,122 +527,73 @@ msgstr ""
 "objednávku. Pozice pro ostatní termíny jsou uvedeny výše, zešedlé – pro "
 "práci s nimi přepněte termín."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3332
 msgid "free — shown in its own seating category's color"
 msgstr "volné – barvou příslušné kategorie sezení"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3334
 msgid "unavailable"
 msgstr "nedostupné"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3335
 msgid "this order's seats"
 msgstr "místa této objednávky"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3338
 msgid "selected to place"
 msgstr "vybráno k usazení"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3342
 msgid "selected to clear"
 msgstr "vybráno ke zrušení"
 
-#: static/pretix_pos/pos.js
-msgid "Select seats to clear"
-msgstr "Vyberte místa ke zrušení"
+#: pretix_pos/static/pretix_pos/pos.js:3351
+msgid "Seats cannot be changed until this order is restored."
+msgstr "Místa nelze měnit, dokud objednávku neobnovíte."
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Clear %(n)s selected seat"
-msgid_plural "Clear %(n)s selected seats"
-msgstr[0] "Zrušit %(n)s vybrané místo"
-msgstr[1] "Zrušit %(n)s vybraná místa"
-msgstr[2] "Zrušit %(n)s vybraných míst"
+#: pretix_pos/static/pretix_pos/pos.js:3355
+msgid "Choose a date above to place seats for that date."
+msgstr "Vyberte termín výše, abyste mohli pro tento termín přiřazovat místa."
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Clearing %(n)s seat…"
-msgid_plural "Clearing %(n)s seats…"
-msgstr[0] "Ruší se %(n)s místo…"
-msgstr[1] "Ruší se %(n)s místa…"
-msgstr[2] "Ruší se %(n)s míst…"
+#: pretix_pos/static/pretix_pos/pos.js:3359
+msgid "This date has no seated positions."
+msgstr "Tento termín nemá žádné pozice se sezením."
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Cleared %(n)s seat."
-msgid_plural "Cleared %(n)s seats."
-msgstr[0] "Zrušeno %(n)s místo."
-msgstr[1] "Zrušena %(n)s místa."
-msgstr[2] "Zrušeno %(n)s míst."
+#: pretix_pos/static/pretix_pos/pos.js:3404
+msgid "Bank transfer"
+msgstr "Bankovní převod"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Cleared %(ok)s/%(n)s seat."
-msgid_plural "Cleared %(ok)s/%(n)s seats."
-msgstr[0] "Zrušeno %(ok)s/%(n)s místo."
-msgstr[1] "Zrušeno %(ok)s/%(n)s místa."
-msgstr[2] "Zrušeno %(ok)s/%(n)s míst."
+#: pretix_pos/static/pretix_pos/pos.js:3432
+msgid "Can't tell which date this order is for."
+msgstr "Nelze zjistit, na který termín je objednávka."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3436
+msgid "Extending…"
+msgstr "Prodlužuji…"
+
+#: pretix_pos/static/pretix_pos/pos.js:3462
+msgid "Charging…"
+msgstr "Zpracování platby…"
+
+#: pretix_pos/static/pretix_pos/pos.js:3495
 msgid ""
-"Clearing seats one by one - this is not a single atomic action, a failure "
-"partway through leaves earlier removals in place…"
-msgstr ""
-"Místa se ruší jedno po druhém – není to jedna nedělitelná akce, při selhání "
-"v půlce zůstanou dřívější zrušení provedená…"
+"Could not cancel %(count)s pending payment, continuing anyway: %(errors)s"
+msgid_plural ""
+"Could not cancel %(count)s pending payments, continuing anyway: %(errors)s"
+msgstr[0] ""
+"Nepodařilo se zrušit %(count)s čekající platbu, pokračuji dále: %(errors)s"
+msgstr[1] ""
+"Nepodařilo se zrušit %(count)s čekající platby, pokračuji dále: %(errors)s"
+msgstr[2] ""
+"Nepodařilo se zrušit %(count)s čekajících plateb, pokračuji dále: %(errors)s"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Batch clearing failed (%(error)s) - retrying one by one…"
-msgstr "Hromadné zrušení selhalo (%(error)s) – zkouším jedno po druhém…"
-
-#: static/pretix_pos/pos.js
-msgid "Scan to pay"
-msgstr "Naskenujte pro platbu"
-
-#: static/pretix_pos/pos.js
-msgid "QR payment code"
-msgstr "QR kód pro platbu"
-
-#: static/pretix_pos/pos.js
-msgid "Amount"
-msgstr "Částka"
-
-#: static/pretix_pos/pos.js
-msgid "Account"
-msgstr "Číslo účtu"
-
-#: static/pretix_pos/pos.js
-msgid "Variable symbol"
-msgstr "Variabilní symbol"
-
-#: static/pretix_pos/pos.js
-msgid "Recipient"
-msgstr "Příjemce"
-
-#: static/pretix_pos/pos.js
-msgid "Close"
-msgstr "Zavřít"
-
-#: static/pretix_pos/pos.js
-msgid "Show QR code"
-msgstr "Zobrazit QR kód"
-
-#: static/pretix_pos/pos.js
-msgid "Payment received"
-msgstr "Platba dorazila"
-
-#: static/pretix_pos/pos.js
-msgid "Confirming…"
-msgstr "Potvrzuji…"
-
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3524
 msgid ""
 "Waiting for the transfer - the order stays unpaid until the money arrives."
 msgstr ""
 "Čeká se na převod – objednávka zůstane nezaplacená, dokud peníze nedorazí."
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3556
 msgid ""
 "This payment has no QR code - check that the bank transfer provider is "
 "configured for this event."
@@ -739,114 +601,315 @@ msgstr ""
 "K této platbě není QR kód – zkontrolujte, že je pro tuto akci nastavená "
 "platební metoda bankovním převodem."
 
-#: static/pretix_pos/pos.js
-msgid "Bank transfer"
-msgstr "Bankovní převod"
+#: pretix_pos/static/pretix_pos/pos.js:3567
+msgid "Scan to pay"
+msgstr "Naskenujte pro platbu"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Paid %(amount)s by %(method)s on %(date)s"
-msgstr "Zaplaceno %(amount)s – %(method)s, %(date)s"
+#: pretix_pos/static/pretix_pos/pos.js:3573
+msgid "QR payment code"
+msgstr "QR kód pro platbu"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Valid until %(date)s"
-msgstr "Platí do %(date)s"
+#: pretix_pos/static/pretix_pos/pos.js:3577
+msgid "Amount"
+msgstr "Částka"
 
-#: static/pretix_pos/pos.js
-msgid "Extend to the event date"
-msgstr "Prodloužit do konání akce"
+#: pretix_pos/static/pretix_pos/pos.js:3578
+msgid "Account"
+msgstr "Číslo účtu"
 
-#: static/pretix_pos/pos.js
-msgid "Extending…"
-msgstr "Prodlužuji…"
+#: pretix_pos/static/pretix_pos/pos.js:3579
+msgid "Variable symbol"
+msgstr "Variabilní symbol"
 
-#: static/pretix_pos/pos.js
-msgid "Can't tell which date this order is for."
-msgstr "Nelze zjistit, na který termín je objednávka."
+#: pretix_pos/static/pretix_pos/pos.js:3580
+msgid "Recipient"
+msgstr "Příjemce"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Expired %(date)s - the seats are no longer held"
-msgstr "Propadlo %(date)s – místa už nejsou držena"
+#: pretix_pos/static/pretix_pos/pos.js:3596
+msgid "Close"
+msgstr "Zavřít"
 
-#: static/pretix_pos/pos.js
-msgid "Revive until the event date"
-msgstr "Obnovit do konání akce"
+#: pretix_pos/static/pretix_pos/pos.js:3615
+msgid "Confirming…"
+msgstr "Potvrzuji…"
 
-#: static/pretix_pos/pos.js
-msgid "Seat this product"
-msgstr "Usadit tento produkt"
+#: pretix_pos/static/pretix_pos/pos.js:3630
+msgid "Cancel this entire order? This cannot be undone."
+msgstr "Zrušit celou tuto objednávku? Tuto akci nelze vzít zpět."
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Seat this product (%(count)s)"
-msgstr "Usadit tento produkt (%(count)s)"
+#: pretix_pos/static/pretix_pos/pos.js:3632
+#: pretix_pos/static/pretix_pos/pos.js:3649
+msgid "Canceling…"
+msgstr "Rušení…"
 
-#: static/pretix_pos/pos.js
-msgid "Placing this — click seats"
-msgstr "Usazuji tento — klikejte do mapy"
+#: pretix_pos/static/pretix_pos/pos.js:3647
+msgid "Cancel this position? This cannot be undone."
+msgstr "Zrušit tuto pozici? Tuto akci nelze vzít zpět."
 
-#: static/pretix_pos/pos.js
-msgid "Click its seats on the map"
-msgstr "Klikejte na jeho místa v mapě"
+#: pretix_pos/static/pretix_pos/pos.js:3696
+msgid "Adding…"
+msgstr "Přidávání…"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "%(name)s — seated, pick a variant"
-msgstr "%(name)s — se sezením, vyberte variantu"
-
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "Placing: %(name)s - the seating plan's own mapping is ignored"
-msgstr "Usazuji: %(name)s – mapování plánu se ignoruje"
-
-#: static/pretix_pos/pos.js
-msgid "Back to the mapping"
-msgstr "Zpět na mapování"
-
-#: static/pretix_pos/pos.js
-msgid ""
-"This seat's category has no product mapped to it - choose a product with "
-"“Seat this product” first."
+#: pretix_pos/static/pretix_pos/pos.js:3729
+msgid "Positions added."
 msgstr ""
-"Kategorie tohoto místa nemá namapovanou žádnou položku – zvolte nejdřív "
-"produkt tlačítkem „Usadit tento produkt“."
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid ""
-"%(name)s has variants, so a seat can't tell which one - pick the variant with "
-"“Seat this product” first."
+#: pretix_pos/static/pretix_pos/pos.js:3729
+#, fuzzy
+#| msgid ""
+#| "Some temporary seats could not be released. Check the order in Edit order."
+msgid "Positions added, but some temporary seats could not be released."
 msgstr ""
-"%(name)s má varianty, takže z místa nelze poznat kterou – vyberte nejdřív "
-"variantu tlačítkem „Usadit tento produkt“."
+"Některá dočasně obsazená místa se nepodařilo uvolnit. Zkontrolujte "
+"objednávku v záložce Upravit objednávku."
 
-#: static/pretix_pos/pos.js
-msgid "This seat can't be booked from here."
-msgstr "Toto místo odsud nelze obsadit."
+#: pretix_pos/static/pretix_pos/pos.js:3755
+msgid "Recording…"
+msgstr "Zaznamenávání…"
 
-#: static/pretix_pos/pos.js
+#: pretix_pos/static/pretix_pos/pos.js:3867
+msgid "%(n)s selected seat"
+msgid_plural "%(n)s selected seats"
+msgstr[0] "%(n)s vybrané místo"
+msgstr[1] "%(n)s vybraná místa"
+msgstr[2] "%(n)s vybraných míst"
+
+#: pretix_pos/static/pretix_pos/pos.js:3868
+msgid "%(n)s checked position"
+msgid_plural "%(n)s checked positions"
+msgstr[0] "%(n)s zaškrtnutá pozice"
+msgstr[1] "%(n)s zaškrtnuté pozice"
+msgstr[2] "%(n)s zaškrtnutých pozic"
+
+#: pretix_pos/static/pretix_pos/pos.js:3869
+msgid "Place %(seats)s on %(positions)s"
+msgstr "Přiřadit %(seats)s na %(positions)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:3875
+msgid "Clear %(n)s selected seat"
+msgid_plural "Clear %(n)s selected seats"
+msgstr[0] "Zrušit %(n)s vybrané místo"
+msgstr[1] "Zrušit %(n)s vybraná místa"
+msgstr[2] "Zrušit %(n)s vybraných míst"
+
+#: pretix_pos/static/pretix_pos/pos.js:3876
+msgid "Select seats to clear"
+msgstr "Vyberte místa ke zrušení"
+
+#: pretix_pos/static/pretix_pos/pos.js:4111
 msgid ""
-"Could not match every seat to its position - assign the missing ones in the "
-"Edit order tab."
+"Placing seats one by one - this is not a single atomic action, a failure "
+"partway through leaves earlier placements in place…"
 msgstr ""
-"Nepodařilo se přiřadit každé místo k jeho pozici – zbytek přiřaďte v záložce "
-"Upravit objednávku."
+"Místa se přiřazují postupně jedno po druhém - nejde o jedinou atomickou "
+"akci, selhání uprostřed ponechá dřívější přiřazení v platnosti…"
 
-#: static/pretix_pos/pos.js
-#, python-format
+#: pretix_pos/static/pretix_pos/pos.js:4116
+msgid "Placed %(ok)s/%(n)s seat."
+msgid_plural "Placed %(ok)s/%(n)s seats."
+msgstr[0] "Přiřazeno %(ok)s/%(n)s místo."
+msgstr[1] "Přiřazena %(ok)s/%(n)s místa."
+msgstr[2] "Přiřazeno %(ok)s/%(n)s míst."
+
+#: pretix_pos/static/pretix_pos/pos.js:4121
+#: pretix_pos/static/pretix_pos/pos.js:4163
+msgid "Failed: %(errors)s"
+msgstr "Selhalo: %(errors)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:4153
 msgid ""
-"The order was created, but %(count)s seat(s) could not be assigned "
-"(%(error)s) - finish it in the Edit order tab."
+"Clearing seats one by one - this is not a single atomic action, a failure "
+"partway through leaves earlier removals in place…"
 msgstr ""
-"Objednávka byla vytvořena, ale %(count)s míst se nepodařilo přiřadit "
-"(%(error)s) – dokončete to v záložce Upravit objednávku."
+"Místa se ruší jedno po druhém – není to jedna nedělitelná akce, při selhání "
+"v půlce zůstanou dřívější zrušení provedená…"
 
-#: static/pretix_pos/pos.js
-#, python-format
-msgid "%(count)s product with no seats in this plan"
-msgid_plural "%(count)s products with no seats in this plan"
-msgstr[0] "%(count)s produkt bez míst v tomto plánu"
-msgstr[1] "%(count)s produkty bez míst v tomto plánu"
-msgstr[2] "%(count)s produktů bez míst v tomto plánu"
+#: pretix_pos/static/pretix_pos/pos.js:4159
+msgid "Cleared %(ok)s/%(n)s seat."
+msgid_plural "Cleared %(ok)s/%(n)s seats."
+msgstr[0] "Zrušeno %(ok)s/%(n)s místo."
+msgstr[1] "Zrušeno %(ok)s/%(n)s místa."
+msgstr[2] "Zrušeno %(ok)s/%(n)s míst."
+
+#: pretix_pos/static/pretix_pos/pos.js:4198
+msgid "Clearing %(n)s seat…"
+msgid_plural "Clearing %(n)s seats…"
+msgstr[0] "Ruší se %(n)s místo…"
+msgstr[1] "Ruší se %(n)s místa…"
+msgstr[2] "Ruší se %(n)s míst…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4211
+msgid "Cleared %(n)s seat."
+msgid_plural "Cleared %(n)s seats."
+msgstr[0] "Zrušeno %(n)s místo."
+msgstr[1] "Zrušena %(n)s místa."
+msgstr[2] "Zrušeno %(n)s míst."
+
+#: pretix_pos/static/pretix_pos/pos.js:4218
+msgid "Batch clearing failed (%(error)s) - retrying one by one…"
+msgstr "Hromadné zrušení selhalo (%(error)s) – zkouším jedno po druhém…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4236
+msgid "Placing %(n)s seat…"
+msgid_plural "Placing %(n)s seats…"
+msgstr[0] "Přiřazuje se %(n)s místo…"
+msgstr[1] "Přiřazují se %(n)s místa…"
+msgstr[2] "Přiřazuje se %(n)s míst…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4254
+msgid "Placed %(n)s seat."
+msgid_plural "Placed %(n)s seats."
+msgstr[0] "Přiřazeno %(n)s místo."
+msgstr[1] "Přiřazena %(n)s místa."
+msgstr[2] "Přiřazeno %(n)s míst."
+
+#: pretix_pos/static/pretix_pos/pos.js:4261
+msgid "Batch placement failed (%(error)s) - retrying one by one…"
+msgstr "Hromadné přiřazení selhalo (%(error)s) - zkouší se jednotlivě…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4271
+msgid "Moving seat…"
+msgstr "Přesouvání místa…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4280
+msgid "Seat moved."
+msgstr "Místo přesunuto."
+
+#: pretix_pos/static/pretix_pos/pos.js:4314
+msgid "Cannot move block: a seat's location is unknown."
+msgstr "Blok nelze přesunout: poloha místa není známá."
+
+#: pretix_pos/static/pretix_pos/pos.js:4322
+msgid "Cannot move block: target position is outside the seating plan."
+msgstr "Blok nelze přesunout: cílová pozice je mimo plán sezení."
+
+#: pretix_pos/static/pretix_pos/pos.js:4326
+msgid "Cannot move block: seat at the target position is already taken."
+msgstr "Blok nelze přesunout: místo na cílové pozici je již obsazené."
+
+#: pretix_pos/static/pretix_pos/pos.js:4330
+msgid "Cannot move block: target seats overlap."
+msgstr "Blok nelze přesunout: cílová místa se překrývají."
+
+#: pretix_pos/static/pretix_pos/pos.js:4364
+#: pretix_pos/static/pretix_pos/pos.js:4409
+msgid "Block moved."
+msgstr "Blok přesunut."
+
+#: pretix_pos/static/pretix_pos/pos.js:4380
+msgid "Some seats failed to move: %(error)s"
+msgstr "Některá místa se nepodařilo přesunout: %(error)s"
+
+#: pretix_pos/static/pretix_pos/pos.js:4389
+msgid "Moving %(n)s seat…"
+msgid_plural "Moving %(n)s seats…"
+msgstr[0] "Přesouvá se %(n)s místo…"
+msgstr[1] "Přesouvají se %(n)s místa…"
+msgstr[2] "Přesouvá se %(n)s míst…"
+
+#: pretix_pos/static/pretix_pos/pos.js:4415
+msgid "Batch move failed (%(error)s) - retrying one by one…"
+msgstr "Hromadný přesun selhal (%(error)s) - zkouší se jednotlivě…"
+
+#~ msgid "Choose a date above."
+#~ msgstr "Vyberte termín výše."
+
+#~ msgid "Pick seats below"
+#~ msgstr "Vyberte místa níže"
+
+#~ msgid "Switch to this item (%(count)s)"
+#~ msgstr "Přepnout na tuto položku (%(count)s)"
+
+#~ msgid "Switch to this item"
+#~ msgstr "Přepnout na tuto položku"
+
+#~ msgid "Seats for: %(name)s"
+#~ msgstr "Místa pro: %(name)s"
+
+#~ msgid "Matching pending reservations found. Choose what to do:"
+#~ msgstr "Nalezeny odpovídající čekající rezervace. Zvolte, co provést:"
+
+#~ msgid "Add to %(code)s (%(customer)s, %(count)s tickets)"
+#~ msgstr "Přidat do %(code)s (%(customer)s, %(count)s vstupenek)"
+
+#~ msgid "This order is no longer pending. Open it in Edit order to handle it."
+#~ msgstr ""
+#~ "Tato objednávka už nečeká na vyřízení. Otevřete ji v záložce Upravit "
+#~ "objednávku."
+
+#~ msgid ""
+#~ "Use Sell now to add tickets to an already paid order, so any difference "
+#~ "can be charged immediately."
+#~ msgstr ""
+#~ "Pro přidání vstupenek do už zaplacené objednávky použijte Prodat nyní, "
+#~ "aby se případný rozdíl ihned uhradil."
+
+#~ msgid "This order has no outstanding amount to charge."
+#~ msgstr "Tato objednávka nemá žádnou zbývající částku k úhradě."
+
+#~ msgid "Sold — order %(code)s, total %(total)s."
+#~ msgstr "Prodáno — objednávka %(code)s, celkem %(total)s."
+
+#~ msgid "Reserved — order %(code)s, total %(total)s."
+#~ msgstr "Rezervováno — objednávka %(code)s, celkem %(total)s."
+
+#~ msgid ""
+#~ "Reserved — order %(code)s, total %(total)s - but couldn't release every "
+#~ "placeholder seat, check the Edit order tab."
+#~ msgstr ""
+#~ "Rezervováno — objednávka %(code)s, celkem %(total)s - ale nepodařilo se "
+#~ "uvolnit všechna zástupná místa, zkontrolujte záložku Upravit objednávku."
+
+#~ msgid ""
+#~ "This order's own seats (for the date selected above) are shown in a muted "
+#~ "highlight color. Click a free seat (or drag a rectangle over several) to "
+#~ "select up to as many as there are checked positions - shown with a ring "
+#~ "only until you click \"Place selected\"; click empty space to clear that "
+#~ "selection. Click one of this order's own seats to remove it. Drag one of "
+#~ "this order's own seats onto a free seat to move it (shown as a "
+#~ "translucent preview while dragging); hold Ctrl while dragging to move its "
+#~ "whole block of seats together. Hover any occupied seat to see which order "
+#~ "holds it, or double-click it to jump straight to that order. Positions "
+#~ "for other dates are listed above, greyed out - switch the date to work "
+#~ "with them."
+#~ msgstr ""
+#~ "Vlastní místa této objednávky (pro termín vybraný výše) jsou zobrazena "
+#~ "tlumenou zvýrazňující barvou. Kliknutím na volné místo (nebo přetažením "
+#~ "obdélníku přes několik míst) vyberete až tolik míst, kolik je "
+#~ "zaškrtnutých pozic - zobrazí se pouze s obrysem, dokud neklikněte na "
+#~ "„Přiřadit vybraná“; kliknutím na prázdné místo výběr zrušíte. Kliknutím "
+#~ "na některé z vlastních míst této objednávky ho odeberete. Přetažením "
+#~ "některého z vlastních míst této objednávky na volné místo ho přesunete "
+#~ "(během přetahování se zobrazí poloprůhledný náhled); podržením klávesy "
+#~ "Ctrl při přetahování přesunete celý blok míst najednou. Najetím myší na "
+#~ "obsazené místo zjistíte, které objednávce patří, nebo na něj dvakrát "
+#~ "klikněte a přejděte přímo na danou objednávku. Pozice pro ostatní termíny "
+#~ "jsou uvedeny výše, zešedlé - pro práci s nimi přepněte termín."
+
+#~ msgid "Place selected seats on checked positions"
+#~ msgstr "Přiřadit vybraná místa k zaškrtnutým pozicím"
+
+#~ msgid "Removing seat…"
+#~ msgstr "Odebírání místa…"
+
+#~ msgid "Seat removed."
+#~ msgstr "Místo odebráno."
+
+#~ msgid ""
+#~ "Moving %(n)s seat - this is not a single atomic action, a failure partway "
+#~ "through leaves it partially done…"
+#~ msgid_plural ""
+#~ "Moving %(n)s seats - this is not a single atomic action, a failure "
+#~ "partway through leaves it partially done…"
+#~ msgstr[0] ""
+#~ "Přesouvá se %(n)s místo - nejde o jedinou atomickou akci, selhání "
+#~ "uprostřed ponechá akci částečně dokončenou…"
+#~ msgstr[1] ""
+#~ "Přesouvají se %(n)s místa - nejde o jedinou atomickou akci, selhání "
+#~ "uprostřed ponechá akci částečně dokončenou…"
+#~ msgstr[2] ""
+#~ "Přesouvá se %(n)s míst - nejde o jedinou atomickou akci, selhání "
+#~ "uprostřed ponechá akci částečně dokončenou…"
+
+#~ msgid "Add a ticket for this date"
+#~ msgstr "Přidat vstupenku na tento termín"
