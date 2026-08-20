@@ -4609,7 +4609,7 @@
                 if (d.movePosition) {
                     if (!isPlacingMode()) {
                         if (removalPool[d.clickSeat.guid]) {
-                            if (e.altKey) delete removalPool[d.clickSeat.guid];
+                            delete removalPool[d.clickSeat.guid];
                         } else if (!e.altKey) {
                             removalPool[d.clickSeat.guid] = d.clickSeat;
                         }
@@ -4620,7 +4620,7 @@
                 }
                 if (d.clickSeat && d.clickSeat.status === "free" && isPlacingMode()) {
                     if (placementPool[d.clickSeat.guid]) {
-                        if (e.altKey) delete placementPool[d.clickSeat.guid];
+                        delete placementPool[d.clickSeat.guid];
                     } else if (!e.altKey && Object.keys(placementPool).length < checkedCount()) {
                         placementPool[d.clickSeat.guid] = d.clickSeat;
                     }
