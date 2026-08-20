@@ -2525,6 +2525,9 @@
     var orderPositionsWrapEl = document.getElementById("pos-order-positions");
     var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
     var filterCurrentDateCheckbox = document.getElementById("pos-filter-current-date");
+    var orderSummaryGeneration = 0;
+    var orderSummaryLoading = false;
+    var orderSummaryNext = null;
 
     // Set by renderOrderDetail() (only while the loaded order is still "n"/pending),
     // kept at module level so seat placement/move/removal - all in initOrderSeatMap(),
@@ -2579,24 +2582,54 @@
         return loadOrderSummaries(q);
     }
 
-    function orderSummaryPath(query) {
+    function orderSummaryPath(query, page) {
         var path = "/" + encodeURIComponent(ORGANIZER) + "/pos/api/events/" +
-            encodeURIComponent(state.event.slug) + "/orders/?ordering=-datetime";
+            encodeURIComponent(state.event.slug) + "/orders/?ordering=-datetime&page_size=50";
         if (query) path += "&q=" + encodeURIComponent(query);
+        if (page > 1) path += "&page=" + page;
         if (filterCurrentDateCheckbox.checked && currentSubeventId() != null) {
             path += "&subevent=" + encodeURIComponent(currentSubeventId());
         }
         return path;
     }
 
-    function loadOrderSummaries(query) {
-        return posApi(orderSummaryPath(query)).then(function (res) {
+    function loadOrderSummaries(query, page, append) {
+        page = page || 1;
+        if (append && orderSummaryLoading) return;
+        if (!append) {
+            orderSummaryGeneration += 1;
+            orderSummaryNext = null;
+        }
+        var generation = orderSummaryGeneration;
+        orderSummaryLoading = true;
+        if (!append) searchResultsEl.textContent = gettext("Loading…");
+        return posApi(orderSummaryPath(query, page)).then(function (res) {
+            if (generation !== orderSummaryGeneration) return;
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
                 return;
             }
-            renderSearchResults((res.data && res.data.results) || []);
+            var data = res.data || {};
+            var previousSentinel = searchResultsEl.querySelector(".pos-orders-sentinel");
+            if (previousSentinel) previousSentinel.remove();
+            renderSearchResults(data.results || [], !!append);
+            if (data.next) {
+                orderSummaryNext = {query: query, page: page + 1, generation: generation};
+            }
+        }).finally(function () {
+            if (generation === orderSummaryGeneration) {
+                orderSummaryLoading = false;
+                maybeLoadMoreOrderSummaries();
+            }
         });
+    }
+
+    function maybeLoadMoreOrderSummaries() {
+        var next = orderSummaryNext;
+        if (!next || next.generation !== orderSummaryGeneration || orderSummaryLoading) return;
+        if (searchResultsEl.scrollTop + searchResultsEl.clientHeight < searchResultsEl.scrollHeight - 300) return;
+        orderSummaryNext = null;
+        loadOrderSummaries(next.query, next.page, true);
     }
 
     searchBtn.addEventListener("click", doSearch);
@@ -2604,6 +2637,7 @@
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
     filterCurrentDateCheckbox.addEventListener("change", doSearch);
+    searchResultsEl.addEventListener("scroll", maybeLoadMoreOrderSummaries);
 
     // A position only "needs a seat" if its date actually has a seating plan
     // at all - a date with none can never have any seated position, so those
@@ -2664,7 +2698,6 @@
     // can browse rather than always having to know a code/name/e-mail
     // upfront - sorted with whatever most likely still needs attention first.
     function loadDefaultOrderList() {
-        searchResultsEl.textContent = gettext("Loading…");
         return loadOrderSummaries("");
     }
 
@@ -2679,10 +2712,10 @@
         return named ? named.attendee_name : gettext("no e-mail");
     }
 
-    function renderSearchResults(orders) {
-        searchResultsEl.innerHTML = "";
+    function renderSearchResults(orders, append) {
+        if (!append) searchResultsEl.innerHTML = "";
         var filtered = orders;
-        if (!filtered.length) {
+        if (!filtered.length && !append) {
             searchResultsEl.textContent = gettext("No matching orders.");
             return;
         }
