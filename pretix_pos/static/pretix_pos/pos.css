@@ -314,6 +314,8 @@ button.pos-tab.active {
 .pos-search-result.pos-order-seated-unpaid:hover { background: #fdf1cc; }
 .pos-search-result.pos-order-canceled { background: #eee; border-color: #ccc; color: #777; }
 .pos-search-result.pos-order-canceled:hover { background: #e2e2e2; }
+.pos-search-result.pos-order-expired { background: #ffebee; border-color: #efb6b6; color: #9b1c1c; }
+.pos-search-result.pos-order-expired:hover { background: #fbdede; }
 
 /* First thing in the summary column, so there's nothing above to separate
    from - the gap belongs underneath it, where the search bar follows. */

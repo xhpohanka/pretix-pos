@@ -2726,12 +2726,14 @@
             // positions are canceled too, so "is it seated" no longer means
             // anything for it either way.
             var canceled = o.status === "c";
-            // Seated+paid (green) / seated+unpaid (yellow) / not yet seated
-            // (plain/white) - staff's main question at a glance is "does this
-            // still need seats", with payment status as a secondary cue only
-            // once seating is already done.
+            var expired = o.status === "e";
+            // Summary rows carry the same seat-category-mapping based answer
+            // as POS needs here; no detailed position list is needed merely to
+            // color an order.
+            var seated = !o.needs_seating;
             div.className = "pos-search-result" +
-                (canceled ? " pos-order-canceled" : "");
+                (canceled ? " pos-order-canceled" : expired ? " pos-order-expired" :
+                    seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = parseFloat(pendingSum(o));

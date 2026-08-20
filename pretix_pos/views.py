@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 
 from pretix.api.auth.permission import EventPermission
 from pretix.api.pagination import Pagination
-from pretix.base.models import Order, OrderPosition
+from pretix.base.models import Order, OrderPosition, SeatCategoryMapping
 
 from .channels import POSSalesChannelType
 
@@ -58,9 +58,16 @@ class POSOrderSummaryView(APIView):
                 order=OuterRef("pk"), subevent_id=subevent, canceled=False,
             )))
 
+        unseated_seated_position = OrderPosition.objects.filter(
+            order=OuterRef("pk"), canceled=False, seat__isnull=True,
+        ).filter(Exists(SeatCategoryMapping.objects.filter(
+            product_id=OuterRef("item_id"),
+        ).filter(Q(subevent_id=OuterRef("subevent_id")) | Q(subevent__isnull=True))))
+
         queryset = queryset.annotate(
             position_count=Count("all_positions", filter=Q(all_positions__canceled=False)),
             customer_name=Min("all_positions__attendee_name_cached", filter=Q(all_positions__canceled=False)),
+            needs_seating=Exists(unseated_seated_position),
             pending_sum=Case(
                 When(status=Order.STATUS_CANCELED, then=F("pending_sum_rc")),
                 default=F("pending_sum_t"),
@@ -70,7 +77,7 @@ class POSOrderSummaryView(APIView):
         page = Pagination()
         summaries = queryset.values(
             "code", "status", "datetime", "last_modified", "expires", "total", "pending_sum",
-            "email", "customer_name", "position_count", "sales_channel_id",
+            "email", "customer_name", "position_count", "needs_seating", "sales_channel_id",
         )
         result_page = page.paginate_queryset(summaries, request, view=self)
         return page.get_paginated_response(result_page)
