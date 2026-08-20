@@ -2526,6 +2526,10 @@
     var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
     var filterCurrentDateCheckbox = document.getElementById("pos-filter-current-date");
     var filterStatusSelect = document.getElementById("pos-filter-status");
+    var filterPaymentSelect = document.getElementById("pos-filter-payment");
+    var filterSeatingSelect = document.getElementById("pos-filter-seating");
+    var filterExpirySelect = document.getElementById("pos-filter-expiry");
+    var filterSourceSelect = document.getElementById("pos-filter-source");
     var orderOrderingSelect = document.getElementById("pos-ordering");
     var clearOrderFiltersBtn = document.getElementById("pos-clear-order-filters");
     var orderSummaryGeneration = 0;
@@ -2606,6 +2610,10 @@
             encodeURIComponent(orderOrderingSelect.value) + "&page_size=50";
         if (query) path += "&q=" + encodeURIComponent(query);
         if (filterStatusSelect.value) path += "&status=" + encodeURIComponent(filterStatusSelect.value);
+        if (filterPaymentSelect.value) path += "&payment=" + encodeURIComponent(filterPaymentSelect.value);
+        if (filterSeatingSelect.value) path += "&seating=" + encodeURIComponent(filterSeatingSelect.value);
+        if (filterExpirySelect.value) path += "&expiry=" + encodeURIComponent(filterExpirySelect.value);
+        if (filterSourceSelect.value) path += "&source=" + encodeURIComponent(filterSourceSelect.value);
         if (page > 1) path += "&page=" + page;
         if (filterCurrentDateCheckbox.checked && currentSubeventId() != null) {
             path += "&subevent=" + encodeURIComponent(currentSubeventId());
@@ -2658,11 +2666,19 @@
     });
     filterCurrentDateCheckbox.addEventListener("change", doSearch);
     filterStatusSelect.addEventListener("change", doSearch);
+    filterPaymentSelect.addEventListener("change", doSearch);
+    filterSeatingSelect.addEventListener("change", doSearch);
+    filterExpirySelect.addEventListener("change", doSearch);
+    filterSourceSelect.addEventListener("change", doSearch);
     orderOrderingSelect.addEventListener("change", doSearch);
     clearOrderFiltersBtn.addEventListener("click", function () {
         searchInput.value = "";
         filterCurrentDateCheckbox.checked = false;
         filterStatusSelect.value = "";
+        filterPaymentSelect.value = "";
+        filterSeatingSelect.value = "";
+        filterExpirySelect.value = "";
+        filterSourceSelect.value = "";
         orderOrderingSelect.value = "-datetime";
         doSearch();
     });

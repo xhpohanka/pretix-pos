@@ -1,5 +1,6 @@
 from django.db.models import Case, Count, Exists, F, Min, OuterRef, Q, When
 from django.http import Http404
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.views.generic import TemplateView
 from django.views.i18n import JavaScriptCatalog
@@ -46,6 +47,22 @@ class POSOrderSummaryView(APIView):
         if statuses:
             queryset = queryset.filter(status__in=statuses)
 
+        source = request.query_params.get("source", "")
+        if source not in ("", "pos", "other"):
+            raise ValidationError({"source": ["Unknown sales channel."]})
+        if source == "pos":
+            queryset = queryset.filter(sales_channel__identifier=POSSalesChannelType.identifier)
+        elif source == "other":
+            queryset = queryset.exclude(sales_channel__identifier=POSSalesChannelType.identifier)
+
+        expiry = request.query_params.get("expiry", "")
+        if expiry not in ("", "expired", "overdue"):
+            raise ValidationError({"expiry": ["Unknown expiry filter."]})
+        if expiry == "expired":
+            queryset = queryset.filter(status=Order.STATUS_EXPIRED)
+        elif expiry == "overdue":
+            queryset = queryset.filter(status=Order.STATUS_PENDING, expires__lt=timezone.now())
+
         query = request.query_params.get("q", "").strip()
         if query:
             queryset = queryset.filter(Q(code__iexact=query) | Q(email__icontains=query))
@@ -73,6 +90,24 @@ class POSOrderSummaryView(APIView):
                 default=F("pending_sum_t"),
             ),
         ).order_by(ordering, "pk")
+
+        payment = request.query_params.get("payment", "")
+        if payment not in ("", "paid", "unpaid", "credit"):
+            raise ValidationError({"payment": ["Unknown payment filter."]})
+        if payment == "paid":
+            queryset = queryset.filter(pending_sum__lte=0)
+        elif payment == "unpaid":
+            queryset = queryset.filter(pending_sum__gt=0)
+        elif payment == "credit":
+            queryset = queryset.filter(pending_sum__lt=0)
+
+        seating = request.query_params.get("seating", "")
+        if seating not in ("", "seated", "unseated"):
+            raise ValidationError({"seating": ["Unknown seating filter."]})
+        if seating == "seated":
+            queryset = queryset.filter(needs_seating=False)
+        elif seating == "unseated":
+            queryset = queryset.filter(needs_seating=True)
 
         page = Pagination()
         summaries = queryset.values(

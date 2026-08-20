@@ -205,6 +205,35 @@
                                         <option value="c">{% trans "Canceled" %}</option>
                                     </select>
                                 </label>
+                                <label>{% trans "Payment" %}
+                                    <select id="pos-filter-payment">
+                                        <option value="">{% trans "Any payment state" %}</option>
+                                        <option value="unpaid">{% trans "Outstanding balance" %}</option>
+                                        <option value="paid">{% trans "Paid in full" %}</option>
+                                        <option value="credit">{% trans "Credit to refund" %}</option>
+                                    </select>
+                                </label>
+                                <label>{% trans "Seating" %}
+                                    <select id="pos-filter-seating">
+                                        <option value="">{% trans "All orders" %}</option>
+                                        <option value="unseated">{% trans "Needs seating" %}</option>
+                                        <option value="seated">{% trans "Fully seated" %}</option>
+                                    </select>
+                                </label>
+                                <label>{% trans "Expiry" %}
+                                    <select id="pos-filter-expiry">
+                                        <option value="">{% trans "Any expiry state" %}</option>
+                                        <option value="expired">{% trans "Expired" %}</option>
+                                        <option value="overdue">{% trans "Pending past deadline" %}</option>
+                                    </select>
+                                </label>
+                                <label>{% trans "Source" %}
+                                    <select id="pos-filter-source">
+                                        <option value="">{% trans "All sources" %}</option>
+                                        <option value="pos">{% trans "Point of sale" %}</option>
+                                        <option value="other">{% trans "Outside point of sale" %}</option>
+                                    </select>
+                                </label>
                                 <label>{% trans "Sort by" %}
                                     <select id="pos-ordering">
                                         <option value="-datetime">{% trans "Newest first" %}</option>

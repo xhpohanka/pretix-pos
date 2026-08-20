@@ -1,8 +1,10 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone as dj_timezone
 from django_scopes import scopes_disabled
-from pretix.base.models import Event, Organizer, Team, User
+from pretix.base.models import Event, Order, Organizer, SalesChannel, Team, User
 
 from pretix_pos.channels import POSSalesChannelType
 
@@ -81,4 +83,40 @@ class POSOrderSummaryViewTest(TestCase):
         self.assertEqual(response.json()["results"], [])
 
         response = self.client.get(url, {"status": "not-a-status"})
+        self.assertEqual(response.status_code, 400)
+
+    @scopes_disabled()
+    def test_filters_payment_source_and_overdue_orders(self):
+        web, _ = SalesChannel.objects.get_or_create(
+            organizer=self.organizer, identifier="web",
+            defaults={"label": "Web", "type": "web"},
+        )
+        pos = SalesChannel.objects.create(
+            organizer=self.organizer, identifier=POSSalesChannelType.identifier,
+            label="POS", type=POSSalesChannelType.identifier,
+        )
+        now = dj_timezone.now()
+        Order.objects.create(
+            code="POSPAID", event=self.event, email="pos@example.com",
+            status=Order.STATUS_PAID, secret="a" * 32, datetime=now,
+            expires=now + timedelta(days=1), sales_channel=pos,
+            total=Decimal("0.00"), locale="en",
+        )
+        Order.objects.create(
+            code="WEBLATE", event=self.event, email="web@example.com",
+            status=Order.STATUS_PENDING, secret="b" * 32, datetime=now,
+            expires=now - timedelta(minutes=1), sales_channel=web,
+            total=Decimal("10.00"), locale="en",
+        )
+        url = f"/{self.organizer.slug}/pos/api/events/{self.event.slug}/orders/"
+
+        response = self.client.get(url, {"payment": "paid", "source": "pos"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([o["code"] for o in response.json()["results"]], ["POSPAID"])
+
+        response = self.client.get(url, {"payment": "unpaid", "expiry": "overdue", "source": "other"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([o["code"] for o in response.json()["results"]], ["WEBLATE"])
+
+        response = self.client.get(url, {"seating": "unknown"})
         self.assertEqual(response.status_code, 400)
