@@ -363,6 +363,13 @@ button.pos-tab.active {
 .pos-order-more-actions .pos-pay-row { margin-top: 8px; }
 .pos-order-more-actions .pos-btn-danger { margin-top: 8px; }
 
+.pos-seat-select-rect {
+    fill: rgba(29, 111, 206, 0.14);
+    stroke: #1d6fce;
+    stroke-width: 2;
+    stroke-dasharray: 4 3;
+}
+
 .pos-position-row {
     display: flex;
     align-items: center;

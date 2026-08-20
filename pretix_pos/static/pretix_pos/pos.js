@@ -1558,6 +1558,120 @@
         switchToFindOrderTab(seat.order_code);
     });
 
+    // Sell/Reserve uses the same rectangle gesture as the order editor, but
+    // commits its selection straight into the local cart. drawSeats supplies
+    // ordinary per-seat clicks; intercept the synthetic click after a drag so
+    // it cannot also toggle the seat where the drag happened to start.
+    var sellSeatDrag = null;
+    var suppressSellSeatClick = false;
+    var SELL_DRAG_THRESHOLD = 4;
+
+    function sellSvgPoint(e) {
+        var pt = svgSell.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        return pt.matrixTransform(svgSell.getScreenCTM().inverse());
+    }
+
+    function sellSeatAtEvent(e) {
+        var el = e.target.closest && e.target.closest("[data-guid]");
+        return el && sellSeats.find(function (s) { return s.guid === el.getAttribute("data-guid"); });
+    }
+
+    function addSeatToCart(seat, target, subeventId) {
+        var label = [seat.zone, seat.row_label, seat.seat_label].filter(Boolean).join(" / ") || seat.guid;
+        cart.push({
+            itemId: target.itemId, variationId: target.variationId || null, seatGuid: seat.guid,
+            price: priceFor(target.itemId, target.variationId || null, subeventId),
+            seatLabel: label, subeventId: subeventId,
+        });
+    }
+
+    svgSell.addEventListener("click", function (e) {
+        if (!suppressSellSeatClick) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+    }, true);
+
+    svgSell.addEventListener("mousedown", function (e) {
+        if (e.button !== 0) return;
+        sellSeatDrag = {start: sellSvgPoint(e), moved: false, rect: null};
+        e.preventDefault();
+    });
+
+    svgSell.addEventListener("mousemove", function (e) {
+        if (!sellSeatDrag) return;
+        var pt = sellSvgPoint(e);
+        var dx = pt.x - sellSeatDrag.start.x, dy = pt.y - sellSeatDrag.start.y;
+        if (!sellSeatDrag.moved && Math.sqrt(dx * dx + dy * dy) < SELL_DRAG_THRESHOLD) return;
+        sellSeatDrag.moved = true;
+        if (!sellSeatDrag.rect) {
+            sellSeatDrag.rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            sellSeatDrag.rect.setAttribute("class", "pos-seat-select-rect");
+            sellSeatDrag.rect.setAttribute("pointer-events", "none");
+            svgSell.appendChild(sellSeatDrag.rect);
+        }
+        sellSeatDrag.rect.setAttribute("x", Math.min(sellSeatDrag.start.x, pt.x));
+        sellSeatDrag.rect.setAttribute("y", Math.min(sellSeatDrag.start.y, pt.y));
+        sellSeatDrag.rect.setAttribute("width", Math.abs(pt.x - sellSeatDrag.start.x));
+        sellSeatDrag.rect.setAttribute("height", Math.abs(pt.y - sellSeatDrag.start.y));
+    });
+
+    window.addEventListener("mouseup", function (e) {
+        if (!sellSeatDrag) return;
+        var drag = sellSeatDrag;
+        sellSeatDrag = null;
+        if (!drag.moved) return;
+        if (drag.rect) drag.rect.remove();
+        suppressSellSeatClick = true;
+        window.setTimeout(function () { suppressSellSeatClick = false; }, 0);
+
+        var pt = sellSvgPoint(e);
+        var x0 = Math.min(drag.start.x, pt.x), x1 = Math.max(drag.start.x, pt.x);
+        var y0 = Math.min(drag.start.y, pt.y), y1 = Math.max(drag.start.y, pt.y);
+        var seId = currentSubeventId();
+        var added = 0, skipped = 0;
+        sellSeats
+            .filter(function (seat) {
+                return seat.x != null && seat.y != null &&
+                    seat.x >= x0 && seat.x <= x1 && seat.y >= y0 && seat.y <= y1;
+            })
+            .sort(function (a, b) { return (a.y - b.y) || (a.x - b.x); })
+            .forEach(function (seat) {
+                var alreadyInCart = cart.some(function (c) {
+                    return c.seatGuid === seat.guid && c.subeventId === seId;
+                });
+                if (seat.status !== "free" || alreadyInCart) {
+                    skipped += 1;
+                    return;
+                }
+                var target = seatTargetFor(seat);
+                if (!target || !canAddSeatTarget(seId, target.itemId, target.variationId || null)) {
+                    skipped += 1;
+                    return;
+                }
+                addSeatToCart(seat, target, seId);
+                added += 1;
+            });
+        if (added) {
+            renderSellItems();
+            renderCart();
+        }
+        if (added || skipped) {
+            var message = interpolate(
+                ngettext("Added %(count)s seat.", "Added %(count)s seats.", added),
+                {count: added}, true
+            );
+            if (skipped) {
+                message += " " + interpolate(
+                    ngettext("Skipped %(count)s seat.", "Skipped %(count)s seats.", skipped),
+                    {count: skipped}, true
+                );
+            }
+            setMsg(seatpickMsg, message, skipped ? "error" : "success");
+        }
+    });
+
     function renderCart() {
         cartEl.innerHTML = "";
         if (!cart.length) {
