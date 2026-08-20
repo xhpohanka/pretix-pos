@@ -3387,6 +3387,21 @@
             refreshPayButtonState();
         }
 
+        // Keep exceptional/destructive actions out of the payment flow. Payment
+        // is the common next step, while extending, reviving and canceling are
+        // deliberate choices hidden under one compact control.
+        orderCancelBlockEl.innerHTML = "";
+        var capabilities = orderCapabilities(order);
+        var moreActions = null;
+        if (capabilities.extend || order.status === "c" || capabilities.cancel) {
+            moreActions = document.createElement("details");
+            moreActions.className = "pos-order-more-actions";
+            var moreSummary = document.createElement("summary");
+            moreSummary.textContent = gettext("More actions");
+            moreActions.appendChild(moreSummary);
+            orderCancelBlockEl.appendChild(moreActions);
+        }
+
         // An unpaid reservation expires on its own and releases the seats. For a
         // "they'll pay at the door" booking taken over the phone that's exactly
         // what staff don't want, and the alternative was editing the date by
@@ -3395,7 +3410,7 @@
         // back to pending, which is the only way to revive one from here.
         // pretix has no "never expires" - Order.expires can't be null - so the
         // performance the order is for is as long as it can live.
-        if (orderCapabilities(order).extend) {
+        if (capabilities.extend) {
             var expiryRow = document.createElement("div");
             expiryRow.className = "pos-pay-row";
             var expiryMsg = document.createElement("div");
@@ -3410,8 +3425,8 @@
             extendBtn.addEventListener("click", function () { extendOrder(order, extendBtn, expiryMsg); });
             expiryRow.appendChild(extendBtn);
 
-            orderPayBlockEl.appendChild(expiryRow);
-            orderPayBlockEl.appendChild(expiryMsg);
+            moreActions.appendChild(expiryRow);
+            moreActions.appendChild(expiryMsg);
         }
 
         if (order.status === "c") {
@@ -3427,23 +3442,21 @@
                 reactivateOrder(order, reactivateBtn, reactivateMsg);
             });
             reactivateRow.appendChild(reactivateBtn);
-            orderPayBlockEl.appendChild(reactivateRow);
-            orderPayBlockEl.appendChild(reactivateMsg);
+            moreActions.appendChild(reactivateRow);
+            moreActions.appendChild(reactivateMsg);
         }
 
-        orderCancelBlockEl.innerHTML = "";
-        if (orderCapabilities(order).cancel) {
+        if (capabilities.cancel) {
             var cancelMsg = document.createElement("div");
             cancelMsg.className = "pos-msg";
 
             var cancelBtn = document.createElement("button");
             cancelBtn.type = "button";
             cancelBtn.className = "pos-btn-danger";
-            cancelBtn.style.marginTop = "10px";
             cancelBtn.textContent = gettext("Cancel entire order");
             cancelBtn.addEventListener("click", function () { cancelOrder(order, cancelBtn, cancelMsg); });
-            orderCancelBlockEl.appendChild(cancelBtn);
-            orderCancelBlockEl.appendChild(cancelMsg);
+            moreActions.appendChild(cancelBtn);
+            moreActions.appendChild(cancelMsg);
         }
     }
 

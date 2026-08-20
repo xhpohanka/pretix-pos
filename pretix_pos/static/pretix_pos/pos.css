@@ -356,12 +356,12 @@ button.pos-tab.active {
     border-radius: 10px;
     box-shadow: 0 1px 2px rgba(20, 24, 28, 0.06), 0 1px 1px rgba(20, 24, 28, 0.04);
     padding: 16px;
-    /* Keeps pay/cancel reachable without scrolling even if the search
-       results above it (own scroll, but still takes some vertical space)
-       plus this order's own summary add up to more than the viewport. */
-    position: sticky;
-    top: 16px;
 }
+#pos-order-detail h3 { margin-top: 0; }
+.pos-order-more-actions { margin-top: 10px; }
+.pos-order-more-actions summary { cursor: pointer; font-weight: 600; }
+.pos-order-more-actions .pos-pay-row { margin-top: 8px; }
+.pos-order-more-actions .pos-btn-danger { margin-top: 8px; }
 
 .pos-position-row {
     display: flex;
