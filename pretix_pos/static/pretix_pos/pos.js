@@ -2597,7 +2597,6 @@
 
     function doSearch() {
         var q = searchInput.value.trim();
-        searchResultsEl.textContent = gettext("Searching…");
         return loadOrderSummaries(q);
     }
 
@@ -2641,7 +2640,11 @@
         }
         var generation = orderSummaryGeneration;
         orderSummaryLoading = true;
-        if (!append) searchResultsEl.textContent = gettext("Loading…");
+        // Keep the expanded order visible while its surrounding browse list
+        // reloads. It owns the position-list and seatmap listeners, so
+        // replacing it with a loading message would make editing flash and
+        // would detach those listeners unnecessarily.
+        if (!append && orderDetailEl.hidden) searchResultsEl.textContent = gettext("Loading…");
         return posApi(orderSummaryPath(query, page)).then(function (res) {
             if (generation !== orderSummaryGeneration) return;
             if (!res.ok) {
@@ -2769,12 +2772,22 @@
     }
 
     function renderSearchResults(orders, append) {
-        if (!append) searchResultsEl.innerHTML = "";
+        var detailVisible = !orderDetailEl.hidden;
+        if (!append) {
+            // The detail is the expanded first tile of this same list. Detach
+            // and put back the *same* DOM node, rather than rebuild it: its
+            // seat-map handlers and staged selection then survive a list
+            // refresh (including infinite scrolling and seat changes).
+            if (detailVisible) orderDetailEl.remove();
+            searchResultsEl.innerHTML = "";
+        }
         var filtered = orders;
         if (!filtered.length && !append) {
-            searchResultsEl.textContent = gettext("No matching orders.");
+            if (detailVisible) searchResultsEl.appendChild(orderDetailEl);
+            searchResultsEl.appendChild(document.createTextNode(gettext("No matching orders.")));
             return;
         }
+        if (!append && detailVisible) searchResultsEl.appendChild(orderDetailEl);
         filtered.forEach(function (o) {
             var div = document.createElement("div");
             // Canceled (grey, sorted last by orderSortKey()) takes priority
@@ -2823,13 +2836,18 @@
         });
     }
 
+    function showOrderDetailInList() {
+        if (!searchResultsEl.contains(orderDetailEl)) searchResultsEl.prepend(orderDetailEl);
+        orderDetailEl.hidden = false;
+    }
+
     function loadOrderDetail(code) {
         code = String(code);
         if (orderDetailLoad && orderDetailLoad.code === code) return orderDetailLoad.promise;
 
         var promise = api(eventPath("/orders/" + encodeURIComponent(code) + "/")).then(function (res) {
             if (!res.ok) {
-                orderDetailEl.hidden = false;
+                showOrderDetailInList();
                 orderDetailEl.textContent = describeError(res.data);
                 orderPositionsWrapEl.textContent = "";
                 return;
@@ -2837,6 +2855,7 @@
             currentOrder = res.data;
             placementPool = {};
             removalPool = {};
+            showOrderDetailInList();
             markSelectedOrder();
             renderOrderDetail();
         });

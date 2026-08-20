@@ -186,7 +186,6 @@
                             <div id="pos-order-positions" class="pos-msg">{% trans "Select an order to see its positions." %}</div>
                         </div>
                         <div class="pos-col pos-col-summary">
-                            <div id="pos-order-detail" hidden></div>
                             <div class="pos-search-bar">
                                 <input type="text" id="pos-search" placeholder="{% trans "Order code, name, e-mail…" %}">
                                 <button id="pos-search-btn" type="button">{% trans "Search" %}</button>
@@ -252,7 +251,9 @@
                                 <li><span class="pos-order-legend-swatch pos-order-legend-expired"></span>{% trans "Expired" %}</li>
                                 <li><span class="pos-order-legend-swatch pos-order-legend-canceled"></span>{% trans "Canceled" %}</li>
                             </ul>
-                            <div id="pos-search-results"></div>
+                            <div id="pos-search-results">
+                                <div id="pos-order-detail" hidden></div>
+                            </div>
                         </div>
                     </div>
                 </div>
