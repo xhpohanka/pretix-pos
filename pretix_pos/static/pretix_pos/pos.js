@@ -2531,6 +2531,7 @@
     var orderSummaryGeneration = 0;
     var orderSummaryLoading = false;
     var orderSummaryNext = null;
+    var orderSummaryRefreshTimer = null;
 
     // Set by renderOrderDetail() (only while the loaded order is still "n"/pending),
     // kept at module level so seat placement/move/removal - all in initOrderSeatMap(),
@@ -2583,6 +2584,20 @@
         var q = searchInput.value.trim();
         searchResultsEl.textContent = gettext("Searching…");
         return loadOrderSummaries(q);
+    }
+
+    // Seat changes keep the open order local so that a large seating session
+    // does not tear down and redraw its map after every click. The browse list
+    // is a separate, aggregated representation, though, and must be reloaded
+    // to pick up the changed needs_seating flag and therefore its color. Batch
+    // placement calls applyPositionSeat once per position, hence the debounce.
+    function scheduleOrderSummaryRefresh() {
+        if (activeTab !== "find" || !state.event || !state.event.slug) return;
+        if (orderSummaryRefreshTimer) clearTimeout(orderSummaryRefreshTimer);
+        orderSummaryRefreshTimer = setTimeout(function () {
+            orderSummaryRefreshTimer = null;
+            loadOrderSummaries(searchInput.value.trim());
+        }, 0);
     }
 
     function orderSummaryPath(query, page) {
@@ -3085,6 +3100,7 @@
             if (newSeat) newSeat.status = "taken";
         }
         scheduleAvailabilityRefresh();
+        scheduleOrderSummaryRefresh();
     }
 
     // Refills the persistent summary containers (see their declarations
