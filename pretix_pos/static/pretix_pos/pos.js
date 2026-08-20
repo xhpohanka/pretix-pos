@@ -1837,7 +1837,12 @@
             if (!orderCapabilities(res.data).structural) {
                 return {error: gettext("This order can no longer be changed here. Open it in Edit order to handle it.")};
             }
-            if (!confirmStructuralChange(res.data)) return {error: gettext("Order change canceled.")};
+            if (mode === "reserve" && !canReserveIntoPaidOrder(res.data, positions)) {
+                return {error: gettext("Create a new reservation for the additional tickets.")};
+            }
+            if (!confirmStructuralChange(res.data, positionsPrice(positions))) {
+                return {error: gettext("Order change canceled.")};
+            }
             return addQuickPositionsToOrder(res.data, positions).then(function (result) {
                 if (result.error) return result;
                 result.positionsAdded = true;
@@ -2489,6 +2494,12 @@
                 if (res.data.status !== "n" && res.data.status !== "p") {
                     return {error: gettext("This order can no longer be changed here. Open it in Edit order to handle it.")};
                 }
+                if (!canReserveIntoPaidOrder(res.data, positions)) {
+                    return {error: gettext("Create a new reservation for the additional tickets.")};
+                }
+                if (!confirmStructuralChange(res.data, positionsPrice(positions))) {
+                    return {error: gettext("Order change canceled.")};
+                }
                 return addQuickPositionsToOrder(res.data, positions);
             });
         } else {
@@ -2869,13 +2880,52 @@
         };
     }
 
-    function confirmStructuralChange(order) {
+    function confirmStructuralChange(order, priceDelta) {
         var capabilities = orderCapabilities(order);
         if (!capabilities.structural) return false;
-        if (!capabilities.online) return true;
-        return window.confirm(gettext(
-            "This order was created online. Check the price, payment status, and any invoice before continuing."
-        ));
+        // Seating is deliberately not routed through this function: moving a
+        // customer to another chair changes neither their tickets nor money,
+        // and is often done repeatedly while finding a suitable place.
+        if (!capabilities.online && order.status !== "p") return true;
+
+        var notices = [];
+        if (capabilities.online) {
+            notices.push(gettext("This order was created online. Check the price, payment status, and any invoice before continuing."));
+        }
+        if (order.status === "p") {
+            notices.push(gettext("This order is already paid. Changing its tickets can create an amount due or a credit to refund."));
+        }
+        var message = notices.join("\n\n");
+        if (priceDelta != null && !isNaN(priceDelta)) {
+            message += "\n\n" + interpolate(
+                priceDelta > 0
+                    ? gettext("Tickets being changed now increase the total by %(amount)s.")
+                    : priceDelta < 0
+                    ? gettext("Tickets being changed now decrease the total by %(amount)s.")
+                    : gettext("Tickets being changed now do not change the total."),
+                {amount: fmtMoney(Math.abs(priceDelta))},
+                true
+            );
+        }
+        return window.confirm(message + "\n\n" + gettext("Continue with this order change?"));
+    }
+
+    function positionsPrice(positions) {
+        return positions.reduce(function (sum, p) {
+            return sum + parseFloat(priceFor(p.item, p.variation || null, p.subevent == null ? null : p.subevent));
+        }, 0);
+    }
+
+    // Reserving a non-free addition would move the entire order back to
+    // pending, including money which was already collected. A later expiry
+    // would then expire that payment along with the new ticket, so require a
+    // separate reservation instead. priceFor is also the price used by POS's
+    // final cart total; POS deliberately has no vouchers, memberships, or
+    // bundles that could make a zero-price addition differ server-side.
+    function canReserveIntoPaidOrder(order, positions) {
+        if (order.status !== "p" || Math.abs(positionsPrice(positions)) < 0.00001) return true;
+        window.alert(gettext("A paid order cannot be extended with a new unpaid amount. Choose ‘create a new reservation’ for these tickets instead."));
+        return false;
     }
 
     function positionLabel(p) {
@@ -3773,7 +3823,7 @@
     function deletePositionFromOrder(pos, btn, msg) {
         var order = currentOrder;
         if (!orderCapabilities(order).structural) return;
-        if (!confirmStructuralChange(order)) return;
+        if (!confirmStructuralChange(order, -parseFloat(pos.price || 0))) return;
         if (!window.confirm(gettext("Cancel this position? This cannot be undone."))) return;
         btn.disabled = true;
         setMsg(msg, gettext("Canceling…"), null);
@@ -3813,7 +3863,6 @@
     function addPositionsToOrder(subeventId, itemId, variationId, count, btn, msg) {
         var order = currentOrder;
         if (!orderCapabilities(order).structural) return;
-        if (!confirmStructuralChange(order)) return;
         var createPositions = [];
         for (var i = 0; i < count; i++) {
             var p = {item: itemId};
@@ -3821,6 +3870,7 @@
             if (subeventId != null) p.subevent = subeventId;
             createPositions.push(p);
         }
+        if (!confirmStructuralChange(order, positionsPrice(createPositions))) return;
 
         btn.disabled = true;
         setMsg(msg, gettext("Adding…"), null);
