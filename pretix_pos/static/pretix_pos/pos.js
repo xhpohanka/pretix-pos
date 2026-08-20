@@ -3592,6 +3592,9 @@
 
     function extendOrder(order, btn, msg) {
         if (!orderCapabilities(order).extend) return;
+        if (order.status === "e" && !window.confirm(gettext(
+            "Revive this expired order? Available capacity and seats will be checked again."
+        ))) return;
         var date = orderLastEventDate(order);
         if (!date) {
             setMsg(msg, gettext("Can't tell which date this order is for."), "error");
