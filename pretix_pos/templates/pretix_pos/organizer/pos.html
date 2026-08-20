@@ -245,6 +245,13 @@
                                 </label>
                                 <button id="pos-clear-order-filters" type="button" class="pos-btn-link">{% trans "Clear filters" %}</button>
                             </div>
+                            <ul class="pos-order-legend" aria-label="{% trans "Order status colors" %}">
+                                <li><span class="pos-order-legend-swatch pos-order-legend-unseated"></span>{% trans "Needs seating" %}</li>
+                                <li><span class="pos-order-legend-swatch pos-order-legend-unpaid"></span>{% trans "Seated, unpaid" %}</li>
+                                <li><span class="pos-order-legend-swatch pos-order-legend-paid"></span>{% trans "Seated, paid" %}</li>
+                                <li><span class="pos-order-legend-swatch pos-order-legend-expired"></span>{% trans "Expired" %}</li>
+                                <li><span class="pos-order-legend-swatch pos-order-legend-canceled"></span>{% trans "Canceled" %}</li>
+                            </ul>
                             <div id="pos-search-results"></div>
                         </div>
                     </div>

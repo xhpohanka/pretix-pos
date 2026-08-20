@@ -294,6 +294,30 @@ button.pos-tab.active {
 .pos-search-filters label { display: grid; gap: 2px; font-size: 12px; }
 .pos-search-filters select { width: auto; }
 
+.pos-order-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 12px;
+    padding: 0;
+    margin: 4px 0 6px;
+    font-size: 12px;
+    color: #555;
+    list-style: none;
+}
+.pos-order-legend li { display: flex; align-items: center; gap: 4px; }
+.pos-order-legend-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border: 1px solid #bbb;
+    border-radius: 2px;
+}
+.pos-order-legend-unseated { background: #fff; }
+.pos-order-legend-unpaid { background: #fff8e1; border-color: #f0dfa8; }
+.pos-order-legend-paid { background: #e6f4ea; border-color: #b7dfc2; }
+.pos-order-legend-expired { background: #ffebee; border-color: #efb6b6; }
+.pos-order-legend-canceled { background: #eee; border-color: #ccc; }
+
 #pos-search-results {
     max-height: 60vh;
     overflow-y: auto;
