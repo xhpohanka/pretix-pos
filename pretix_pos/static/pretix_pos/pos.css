@@ -334,6 +334,10 @@ button.pos-tab.active {
 }
 .pos-search-result:hover { background: #f5f5f5; }
 .pos-search-result .pos-order-code { font-weight: 700; }
+.pos-search-result.pos-search-result-selected {
+    border-color: #1d6fce;
+    box-shadow: 0 0 0 2px #b8d8fa;
+}
 
 .pos-search-result.pos-order-seated-paid { background: #e6f4ea; border-color: #b7dfc2; }
 .pos-search-result.pos-order-seated-paid:hover { background: #d9eee0; }

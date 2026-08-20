@@ -2789,7 +2789,9 @@
             var seated = !o.needs_seating;
             div.className = "pos-search-result" +
                 (canceled ? " pos-order-canceled" : expired ? " pos-order-expired" :
-                    seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
+                    seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "") +
+                (currentOrder && currentOrder.code === o.code ? " pos-search-result-selected" : "");
+            div.dataset.orderCode = o.code;
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = parseFloat(pendingSum(o));
@@ -2815,6 +2817,12 @@
         });
     }
 
+    function markSelectedOrder() {
+        Array.prototype.slice.call(searchResultsEl.querySelectorAll(".pos-search-result")).forEach(function (row) {
+            row.classList.toggle("pos-search-result-selected", !!currentOrder && row.dataset.orderCode === currentOrder.code);
+        });
+    }
+
     function loadOrderDetail(code) {
         code = String(code);
         if (orderDetailLoad && orderDetailLoad.code === code) return orderDetailLoad.promise;
@@ -2829,6 +2837,7 @@
             currentOrder = res.data;
             placementPool = {};
             removalPool = {};
+            markSelectedOrder();
             renderOrderDetail();
         });
         orderDetailLoad = {code: code, promise: promise};
