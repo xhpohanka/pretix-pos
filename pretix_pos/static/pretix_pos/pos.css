@@ -691,6 +691,35 @@ button.pos-qty-inc { border-radius: 0 6px 6px 0; }
     margin-top: 16px;
 }
 
+.pos-overlay-box.pos-customer-form {
+    max-width: 620px;
+    text-align: left;
+}
+.pos-customer-form h2 { margin-top: 0; }
+.pos-customer-field {
+    display: grid;
+    gap: 3px;
+    margin-top: 10px;
+    font-size: 13px;
+}
+.pos-customer-field input { width: 100%; }
+.pos-customer-billing-toggle,
+.pos-customer-business {
+    display: block;
+    margin-top: 14px;
+    font-weight: 600;
+}
+.pos-customer-billing-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 10px;
+    margin-top: 4px;
+}
+.pos-customer-billing-fields .pos-customer-business { grid-column: 1 / -1; }
+@media (max-width: 500px) {
+    .pos-customer-billing-fields { grid-template-columns: 1fr; }
+}
+
 /* One line per confirmed payment under the order total. */
 .pos-paid-with {
     margin: 4px 0 0;

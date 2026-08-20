@@ -3393,13 +3393,22 @@
         orderCancelBlockEl.innerHTML = "";
         var capabilities = orderCapabilities(order);
         var moreActions = null;
-        if (capabilities.extend || order.status === "c" || capabilities.cancel) {
+        if (capabilities.structural || capabilities.extend || order.status === "c" || capabilities.cancel) {
             moreActions = document.createElement("details");
             moreActions.className = "pos-order-more-actions";
             var moreSummary = document.createElement("summary");
             moreSummary.textContent = gettext("More actions");
             moreActions.appendChild(moreSummary);
             orderCancelBlockEl.appendChild(moreActions);
+        }
+
+        if (capabilities.structural) {
+            var customerBtn = document.createElement("button");
+            customerBtn.type = "button";
+            customerBtn.className = "pos-btn-secondary";
+            customerBtn.textContent = gettext("Customer and billing details");
+            customerBtn.addEventListener("click", function () { openCustomerDetails(order); });
+            moreActions.appendChild(customerBtn);
         }
 
         // An unpaid reservation expires on its own and releases the seats. For a
@@ -3813,6 +3822,172 @@
 
         // Clicking the backdrop closes too, but a click *inside* the box must
         // not - staff read the account number off it and will click it.
+        overlay.addEventListener("click", function (e) {
+            if (e.target === overlay) overlay.remove();
+        });
+        document.body.appendChild(overlay);
+    }
+
+    // Customer identity and invoice identity are deliberately separate: an
+    // order e-mail identifies who receives messages, while attendee names on
+    // positions stay untouched and billing data belongs only to the invoice.
+    function openCustomerDetails(order) {
+        var overlay = document.createElement("div");
+        overlay.className = "pos-overlay";
+        var box = document.createElement("form");
+        box.className = "pos-overlay-box pos-customer-form";
+        overlay.appendChild(box);
+
+        var title = document.createElement("h2");
+        title.textContent = gettext("Customer and billing details");
+        box.appendChild(title);
+        if (orderCapabilities(order).online) {
+            var onlineWarning = document.createElement("p");
+            onlineWarning.className = "pos-msg pos-error";
+            onlineWarning.textContent = gettext("This is an online order. Check the customer's request carefully before saving.");
+            box.appendChild(onlineWarning);
+        }
+
+        function addInput(label, value, type) {
+            var wrap = document.createElement("label");
+            wrap.className = "pos-customer-field";
+            wrap.appendChild(document.createTextNode(label));
+            var input = document.createElement("input");
+            input.type = type || "text";
+            input.value = value || "";
+            wrap.appendChild(input);
+            box.appendChild(wrap);
+            return input;
+        }
+
+        var emailInput = addInput(gettext("E-mail"), order.email, "email");
+        var phoneInput = addInput(gettext("Phone"), order.phone, "tel");
+        var invoice = order.invoice_address || null;
+        var billingToggle = document.createElement("label");
+        billingToggle.className = "pos-customer-billing-toggle";
+        var billingCheckbox = document.createElement("input");
+        billingCheckbox.type = "checkbox";
+        billingCheckbox.checked = !!invoice;
+        billingToggle.appendChild(billingCheckbox);
+        billingToggle.appendChild(document.createTextNode(" " + gettext("Edit billing details")));
+        box.appendChild(billingToggle);
+
+        var billingFields = document.createElement("div");
+        billingFields.className = "pos-customer-billing-fields";
+        box.appendChild(billingFields);
+        function addBillingInput(label, field, type) {
+            var wrap = document.createElement("label");
+            wrap.className = "pos-customer-field";
+            wrap.appendChild(document.createTextNode(label));
+            var input = document.createElement("input");
+            input.type = type || "text";
+            input.value = invoice && invoice[field] || "";
+            wrap.appendChild(input);
+            billingFields.appendChild(wrap);
+            return input;
+        }
+        var businessInput = document.createElement("input");
+        businessInput.type = "checkbox";
+        businessInput.checked = !!(invoice && invoice.is_business);
+        var businessLabel = document.createElement("label");
+        businessLabel.className = "pos-customer-business";
+        businessLabel.appendChild(businessInput);
+        businessLabel.appendChild(document.createTextNode(" " + gettext("Company")));
+        billingFields.appendChild(businessLabel);
+        var companyInput = addBillingInput(gettext("Company name"), "company");
+        var nameInput = addBillingInput(gettext("Billing name"), "name");
+        var streetInput = addBillingInput(gettext("Street"), "street");
+        var zipInput = addBillingInput(gettext("ZIP code"), "zipcode");
+        var cityInput = addBillingInput(gettext("City"), "city");
+        var countryInput = addBillingInput(gettext("Country code"), "country");
+        countryInput.maxLength = 2;
+        var vatInput = addBillingInput(gettext("VAT ID"), "vat_id");
+        function updateBillingVisibility() { billingFields.hidden = !billingCheckbox.checked; }
+        billingCheckbox.addEventListener("change", updateBillingVisibility);
+        updateBillingVisibility();
+
+        var msg = document.createElement("div");
+        msg.className = "pos-msg";
+        box.appendChild(msg);
+        var actions = document.createElement("div");
+        actions.className = "pos-actions";
+        var cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = gettext("Cancel");
+        cancel.addEventListener("click", function () { overlay.remove(); });
+        actions.appendChild(cancel);
+        var save = document.createElement("button");
+        save.type = "submit";
+        save.className = "pos-btn-primary";
+        save.textContent = gettext("Save details");
+        actions.appendChild(save);
+        box.appendChild(actions);
+
+        function billingData() {
+            return {
+                is_business: businessInput.checked,
+                company: companyInput.value.trim(),
+                name: nameInput.value.trim(),
+                street: streetInput.value.trim(),
+                zipcode: zipInput.value.trim(),
+                city: cityInput.value.trim(),
+                country: countryInput.value.trim().toUpperCase(),
+                vat_id: vatInput.value.trim(),
+            };
+        }
+        function billingChanged(data) {
+            // The checkbox is an editor toggle, not a destructive “remove
+            // invoice address” switch. Removing billing data would need a
+            // separate explicit action, especially once an invoice exists.
+            if (!billingCheckbox.checked) return false;
+            if (!invoice) return Object.keys(data).some(function (key) {
+                return key === "is_business" ? data[key] : !!data[key];
+            });
+            return Object.keys(data).some(function (key) {
+                return String(data[key]) !== String(invoice[key] == null ? "" : invoice[key]);
+            });
+        }
+        function hasActiveInvoice() {
+            return api(eventPath("/invoices/?order=" + encodeURIComponent(order.code) + "&is_cancellation=false&page_size=1"))
+                .then(function (res) {
+                    return res.ok && ((res.data && res.data.results) || []).length > 0;
+                });
+        }
+        function saveChanges(payload) {
+            save.disabled = true;
+            setMsg(msg, gettext("Saving…"), null);
+            return api(eventPath("/orders/" + encodeURIComponent(order.code) + "/"), {
+                method: "PATCH", body: JSON.stringify(payload),
+            }).then(function (res) {
+                if (!res.ok) {
+                    save.disabled = false;
+                    setMsg(msg, describeError(res.data), "error");
+                    return;
+                }
+                currentOrder = res.data;
+                refreshOrderSummary();
+                scheduleOrderSummaryRefresh();
+                overlay.remove();
+            });
+        }
+        box.addEventListener("submit", function (e) {
+            e.preventDefault();
+            var data = billingData();
+            var invoiceChanged = billingChanged(data);
+            var payload = {email: emailInput.value.trim(), phone: phoneInput.value.trim()};
+            if (invoiceChanged) payload.invoice_address = billingCheckbox.checked ? data : null;
+            if (!invoiceChanged) return saveChanges(payload);
+            hasActiveInvoice().then(function (exists) {
+                if (!exists) return saveChanges(payload);
+                setMsg(msg, gettext("This order already has an invoice. Change its billing details in the administration so the invoice can be reissued correctly."), "error");
+                var link = document.createElement("a");
+                link.href = "/control/event/" + encodeURIComponent(ORGANIZER) + "/" +
+                    encodeURIComponent(state.event.slug) + "/orders/" + encodeURIComponent(order.code) + "/";
+                link.textContent = gettext("Open order in administration");
+                msg.appendChild(document.createElement("br"));
+                msg.appendChild(link);
+            });
+        });
         overlay.addEventListener("click", function (e) {
             if (e.target === overlay) overlay.remove();
         });
