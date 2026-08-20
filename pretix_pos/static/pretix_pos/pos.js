@@ -960,6 +960,7 @@
     var sellItemsEl = document.getElementById("pos-items");
     var seatpickWrap = document.getElementById("pos-seatpick-wrap");
     var svgSell = document.getElementById("pos-svg-sell");
+    var clearSellSeatsBtn = document.getElementById("pos-btn-clear-sell-seats");
     var seatOverrideEl = document.getElementById("pos-seat-override");
     var seatpickMsg = document.getElementById("pos-seatpick-msg");
     var cartEl = document.getElementById("pos-cart");
@@ -1492,6 +1493,10 @@
             return;
         }
         seatpickWrap.hidden = false;
+        svgSell.setAttribute("tabindex", "0");
+        clearSellSeatsBtn.disabled = !cart.some(function (c) {
+            return c.seatGuid && c.subeventId === currentSubeventId();
+        });
         renderOverrideBanner();
         var seId = currentSubeventId();
         // Same ring-only, no-fill treatment as pretix_seatmap's eshop picker for
@@ -1587,6 +1592,28 @@
         });
     }
 
+    function clearSellSeatsForCurrentDate() {
+        var seId = currentSubeventId();
+        var before = cart.length;
+        cart = cart.filter(function (c) { return !c.seatGuid || c.subeventId !== seId; });
+        var removed = before - cart.length;
+        if (!removed) return;
+        renderSeatpick();
+        renderSellItems();
+        renderCart();
+        setMsg(seatpickMsg, interpolate(
+            ngettext("Cleared %(count)s selected seat.", "Cleared %(count)s selected seats.", removed),
+            {count: removed}, true
+        ), "success");
+    }
+
+    clearSellSeatsBtn.addEventListener("click", clearSellSeatsForCurrentDate);
+    svgSell.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        e.preventDefault();
+        clearSellSeatsForCurrentDate();
+    });
+
     svgSell.addEventListener("click", function (e) {
         if (!suppressSellSeatClick) return;
         e.preventDefault();
@@ -1595,6 +1622,7 @@
 
     svgSell.addEventListener("mousedown", function (e) {
         if (e.button !== 0) return;
+        svgSell.focus();
         sellSeatDrag = {start: sellSvgPoint(e), moved: false, rect: null};
         e.preventDefault();
     });
@@ -1630,7 +1658,8 @@
         var x0 = Math.min(drag.start.x, pt.x), x1 = Math.max(drag.start.x, pt.x);
         var y0 = Math.min(drag.start.y, pt.y), y1 = Math.max(drag.start.y, pt.y);
         var seId = currentSubeventId();
-        var added = 0, skipped = 0;
+        var added = 0, removed = 0, skipped = 0;
+        var removing = e.altKey;
         sellSeats
             .filter(function (seat) {
                 return seat.x != null && seat.y != null &&
@@ -1641,6 +1670,17 @@
                 var alreadyInCart = cart.some(function (c) {
                     return c.seatGuid === seat.guid && c.subeventId === seId;
                 });
+                if (removing) {
+                    if (!alreadyInCart) {
+                        skipped += 1;
+                        return;
+                    }
+                    cart = cart.filter(function (c) {
+                        return c.seatGuid !== seat.guid || c.subeventId !== seId;
+                    });
+                    removed += 1;
+                    return;
+                }
                 if (seat.status !== "free" || alreadyInCart) {
                     skipped += 1;
                     return;
@@ -1653,14 +1693,17 @@
                 addSeatToCart(seat, target, seId);
                 added += 1;
             });
-        if (added) {
+        if (added || removed) {
+            renderSeatpick();
             renderSellItems();
             renderCart();
         }
-        if (added || skipped) {
+        if (added || removed || skipped) {
             var message = interpolate(
-                ngettext("Added %(count)s seat.", "Added %(count)s seats.", added),
-                {count: added}, true
+                removing
+                    ? ngettext("Removed %(count)s seat.", "Removed %(count)s seats.", removed)
+                    : ngettext("Added %(count)s seat.", "Added %(count)s seats.", added),
+                {count: removing ? removed : added}, true
             );
             if (skipped) {
                 message += " " + interpolate(
@@ -3641,7 +3684,7 @@
         function setSeatmapHelp() {
             var title = document.getElementById("pos-order-seatmap-title");
             if (!title) return;
-            title.title = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. What clicking does depends on the checkboxes in the position list: with positions checked you are placing seats, so clicks and rectangle drags pick free seats; with nothing checked you are clearing seats, so they pick this order's own seats instead. Either way the selection is only staged - shown with a ring - until you press the button next to the legend, and clicking empty space clears it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
+            title.title = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. What clicking does depends on the checkboxes in the position list: with positions checked you are placing seats, so clicks and rectangle drags pick free seats; with nothing checked you are clearing seats, so they pick this order's own seats instead. Either way the selection is only staged - shown with a ring - until you press the button next to the legend. Hold Alt to remove seats from a staged selection; use × or Escape to clear it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
         }
 
         function legendItem(swatchStyle, text) {
@@ -3713,6 +3756,13 @@
             placeBtn.type = "button";
             placeBtn.className = "pos-btn-primary";
             bar.appendChild(placeBtn);
+            var clearSelectionBtn = document.createElement("button");
+            clearSelectionBtn.type = "button";
+            clearSelectionBtn.className = "pos-btn-icon";
+            clearSelectionBtn.textContent = "×";
+            clearSelectionBtn.title = gettext("Clear staged seat selection");
+            clearSelectionBtn.setAttribute("aria-label", gettext("Clear staged seat selection"));
+            bar.appendChild(clearSelectionBtn);
             orderSeatmapWrapEl.appendChild(bar);
 
             var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -3726,7 +3776,7 @@
             // space above the map every day.
             orderSeatmapWrapEl.appendChild(buildSeatmapLegend());
 
-            orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, placeMsg, orderListEl, seId);
+            orderSeatmapRedraw = initOrderSeatMap(svg, placeBtn, clearSelectionBtn, placeMsg, orderListEl, seId);
         });
     }
 
@@ -4288,7 +4338,7 @@
 
     var seatMapMouseUpHandler = null;
 
-    function initOrderSeatMap(svg, placeBtn, msgEl, positionListEl, subeventId) {
+    function initOrderSeatMap(svg, placeBtn, clearSelectionBtn, msgEl, positionListEl, subeventId) {
         var seats = orderSeats;
         var drag = null;
 
@@ -4379,6 +4429,7 @@
         }
 
         function renderPlaceBtn() {
+            clearSelectionBtn.disabled = !Object.keys(placementPool).length && !Object.keys(removalPool).length;
             if (isPlacingMode()) {
                 var n = Object.keys(placementPool).length;
                 var checked = checkedCount();
@@ -4396,6 +4447,23 @@
                 placeBtn.disabled = r === 0;
             }
         }
+
+        function clearStagedSelection() {
+            if (!Object.keys(placementPool).length && !Object.keys(removalPool).length) return;
+            placementPool = {};
+            removalPool = {};
+            render();
+            renderPlaceBtn();
+            setMsg(msgEl, gettext("Staged seat selection cleared."), null);
+        }
+
+        clearSelectionBtn.addEventListener("click", clearStagedSelection);
+        svg.setAttribute("tabindex", "0");
+        svg.addEventListener("keydown", function (e) {
+            if (e.key !== "Escape") return;
+            e.preventDefault();
+            clearStagedSelection();
+        });
 
         // Checking or unchecking a position can flip the mode, which would leave
         // a selection staged for an action the button no longer offers - and an
@@ -4473,6 +4541,7 @@
 
         svg.addEventListener("mousedown", function (e) {
             if (e.button !== 0) return;
+            svg.focus();
             var seat = seatAtEvent(e);
             drag = {
                 startPt: svgPoint(e),
@@ -4528,8 +4597,8 @@
                 if (d.movePosition) {
                     if (!isPlacingMode()) {
                         if (removalPool[d.clickSeat.guid]) {
-                            delete removalPool[d.clickSeat.guid];
-                        } else {
+                            if (e.altKey) delete removalPool[d.clickSeat.guid];
+                        } else if (!e.altKey) {
                             removalPool[d.clickSeat.guid] = d.clickSeat;
                         }
                         render();
@@ -4539,26 +4608,17 @@
                 }
                 if (d.clickSeat && d.clickSeat.status === "free" && isPlacingMode()) {
                     if (placementPool[d.clickSeat.guid]) {
-                        delete placementPool[d.clickSeat.guid];
-                    } else if (Object.keys(placementPool).length < checkedCount()) {
+                        if (e.altKey) delete placementPool[d.clickSeat.guid];
+                    } else if (!e.altKey && Object.keys(placementPool).length < checkedCount()) {
                         placementPool[d.clickSeat.guid] = d.clickSeat;
                     }
                     render();
                     renderPlaceBtn();
                     return;
                 }
-                // A plain click that didn't land on any seat at all - clears
-                // whatever's staged, so staff have an easy way out of a
-                // selection without having to click every seat again
-                // individually. A *drag* starting from empty space is the
-                // rubber-band multi-select (the d.moved branch below) and is
-                // unaffected by this - only a non-dragging click clears.
-                if (!d.clickSeat && (Object.keys(placementPool).length || Object.keys(removalPool).length)) {
-                    placementPool = {};
-                    removalPool = {};
-                    render();
-                    renderPlaceBtn();
-                }
+                // Empty-map clicks deliberately do nothing. They are common
+                // while panning/looking around and must not discard a careful
+                // multi-selection; use the visible × or Escape instead.
                 return;
             }
 
@@ -4600,15 +4660,23 @@
                 if (s.x == null || s.y == null) return;
                 if (!(s.x >= rect.x0 && s.x <= rect.x1 && s.y >= rect.y0 && s.y <= rect.y1)) return;
                 if (placing) {
-                    if (s.status !== "free" || placementPool[s.guid]) return;
-                    if (Object.keys(placementPool).length >= cap) return;
+                    if (s.status !== "free") return;
+                    if (e.altKey) {
+                        delete placementPool[s.guid];
+                        return;
+                    }
+                    if (placementPool[s.guid] || Object.keys(placementPool).length >= cap) return;
                     placementPool[s.guid] = s;
                 } else {
                     // No cap when clearing: unlike placement, which can't outrun
                     // the number of positions waiting for a seat, there's nothing
                     // stopping staff clearing every seat the order holds.
                     if (!isOwnSeat(s)) return;
-                    removalPool[s.guid] = s;
+                    if (e.altKey) {
+                        delete removalPool[s.guid];
+                    } else {
+                        removalPool[s.guid] = s;
+                    }
                 }
             });
             render();

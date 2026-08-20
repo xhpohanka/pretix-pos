@@ -369,6 +369,12 @@ button.pos-tab.active {
     stroke-width: 2;
     stroke-dasharray: 4 3;
 }
+.pos-seatpick-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.pos-seatpick-bar h3 { margin: 0; }
 
 .pos-position-row {
     display: flex;
