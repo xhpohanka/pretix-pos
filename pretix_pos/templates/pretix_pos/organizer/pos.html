@@ -195,6 +195,27 @@
                                 <input type="checkbox" id="pos-filter-current-date">
                                 <span>{% trans "This date only" %}</span>
                             </label>
+                            <div class="pos-search-filters">
+                                <label>{% trans "Status" %}
+                                    <select id="pos-filter-status">
+                                        <option value="">{% trans "All statuses" %}</option>
+                                        <option value="n">{% trans "Pending" %}</option>
+                                        <option value="p">{% trans "Paid" %}</option>
+                                        <option value="e">{% trans "Expired" %}</option>
+                                        <option value="c">{% trans "Canceled" %}</option>
+                                    </select>
+                                </label>
+                                <label>{% trans "Sort by" %}
+                                    <select id="pos-ordering">
+                                        <option value="-datetime">{% trans "Newest first" %}</option>
+                                        <option value="datetime">{% trans "Oldest first" %}</option>
+                                        <option value="-total">{% trans "Highest price" %}</option>
+                                        <option value="total">{% trans "Lowest price" %}</option>
+                                        <option value="-last_modified">{% trans "Recently changed" %}</option>
+                                    </select>
+                                </label>
+                                <button id="pos-clear-order-filters" type="button" class="pos-btn-link">{% trans "Clear filters" %}</button>
+                            </div>
                             <div id="pos-search-results"></div>
                         </div>
                     </div>

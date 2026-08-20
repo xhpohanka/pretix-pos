@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pretix-pos\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-08-12 09:13+0000\n"
+"POT-Creation-Date: 2026-08-20 10:35+0200\n"
 "PO-Revision-Date: 2026-08-12 09:13+0000\n"
 "Last-Translator: Jan Pohanka\n"
 "Language-Team: Czech\n"
@@ -16,247 +16,42 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 
-#: apps.py:13 channels.py:17 signals.py:23
-#: templates/pretix_pos/organizer/pos.html:8
-#: templates/pretix_pos/organizer/pos.html:18 views.py:32
+#: pretix_pos/apps.py:13 pretix_pos/channels.py:16 pretix_pos/signals.py:23
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:9
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:19
+#: pretix_pos/views.py:120
 msgid "Point of sale"
 msgstr "Prodejní místo"
 
-#: apps.py:16
-msgid "Standalone box-office terminal app: pair a device (no pretix login needed), pick an event, then sell tickets for cash, take reservations, sell existing reservations, and place or move seats - from any browser on any computer."
-msgstr "Samostatná aplikace pro pokladní terminál: spárujte zařízení (bez nutnosti přihlášení do pretixu), vyberte akci a poté prodávejte vstupenky za hotovost, přijímejte rezervace, prodávejte již vytvořené rezervace a přiřazujte nebo přesouvejte místa k sezení - z libovolného prohlížeče na jakémkoli počítači."
+#: pretix_pos/apps.py:16
+msgid ""
+"Standalone box-office terminal app: pair a device (no pretix login needed), "
+"pick an event, then sell tickets for cash, take reservations, sell existing "
+"reservations, and place or move seats - from any browser on any computer."
+msgstr ""
+"Samostatná aplikace pro pokladní terminál: spárujte zařízení (bez nutnosti "
+"přihlášení do pretixu), vyberte akci a poté prodávejte vstupenky za "
+"hotovost, přijímejte rezervace, prodávejte již vytvořené rezervace a "
+"přiřazujte nebo přesouvejte místa k sezení - z libovolného prohlížeče na "
+"jakémkoli počítači."
 
-#: templates/pretix_pos/organizer/pos.html:21
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:22
 msgid "Till"
 msgstr "Pokladna"
 
-#: templates/pretix_pos/organizer/pos.html:22
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:23
+msgid "Refresh"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:24
 msgid "Change event"
 msgstr "Změnit akci"
 
-#: templates/pretix_pos/organizer/pos.html:23
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:25
 msgid "Unpair this device"
 msgstr "Zrušit spárování tohoto zařízení"
 
-#: templates/pretix_pos/organizer/pos.html:29
-msgid "Pair this terminal"
-msgstr "Spárovat tento terminál"
-
-#: templates/pretix_pos/organizer/pos.html:31
-msgid ""
-"\n"
-"                        In the pretix control panel, go to your organizer's \"Devices\" page, add a\n"
-"                        device (or reuse an existing unpaired one) and open its \"Connect\" page.\n"
-"                        Paste the token shown there below.\n"
-"                    "
-msgstr ""
-"\n"
-"                        V administraci pretixu přejděte na stránku „Zařízení“ u vašeho pořadatele,\n"
-"                        přidejte zařízení (nebo použijte již existující nespárované) a otevřete jeho\n"
-"                        stránku „Připojit“. Zkopírovaný token vložte níže.\n"
-"                    "
-
-#: templates/pretix_pos/organizer/pos.html:38
-msgid "Initialization token"
-msgstr "Inicializační token"
-
-#: templates/pretix_pos/organizer/pos.html:40
-msgid "Connect"
-msgstr "Připojit"
-
-#: templates/pretix_pos/organizer/pos.html:46
-msgid "Already paired this terminal before?"
-msgstr "Byl tento terminál již dříve spárován?"
-
-#: templates/pretix_pos/organizer/pos.html:48
-msgid ""
-"\n"
-"                        If this browser forgot its connection (its saved data was cleared, or\n"
-"                        you're on a different computer), restore it yourself with the recovery\n"
-"                        code you saved when it was first paired here - no administrator needed.\n"
-"                    "
-msgstr ""
-"\n"
-"                        Pokud tento prohlížeč zapomněl své připojení (uložená data byla vymazána,\n"
-"                        nebo jste na jiném počítači), obnovte si ho sami pomocí obnovovacího kódu,\n"
-"                        který jste si uložili při prvním spárování - administrátor není potřeba.\n"
-"                    "
-
-#: templates/pretix_pos/organizer/pos.html:55
-msgid "Recovery code"
-msgstr "Obnovovací kód"
-
-#: templates/pretix_pos/organizer/pos.html:57
-msgid "Restore"
-msgstr "Obnovit"
-
-#: templates/pretix_pos/organizer/pos.html:63
-msgid "Save this recovery code"
-msgstr "Uložte si tento obnovovací kód"
-
-#: templates/pretix_pos/organizer/pos.html:65
-msgid ""
-"\n"
-"                        Write this code down and keep it somewhere safe near the till (taped\n"
-"                        underneath, in a password manager, with a manager, ...). If this browser\n"
-"                        ever forgets its connection to this terminal, you can restore access\n"
-"                        yourself with this exact code - no administrator needed.\n"
-"                    "
-msgstr ""
-"\n"
-"                        Tento kód si zapište a uschovejte na bezpečném místě u pokladny (přilepený\n"
-"                        zespodu, v správci hesel, u vedoucího, ...). Pokud tento prohlížeč někdy\n"
-"                        zapomene své připojení k tomuto terminálu, můžete si přístup sami obnovit\n"
-"                        pomocí přesně tohoto kódu - administrátor není potřeba.\n"
-"                    "
-
-#: templates/pretix_pos/organizer/pos.html:74
-msgid "Copy"
-msgstr "Kopírovat"
-
-#: templates/pretix_pos/organizer/pos.html:75
-msgid "I've saved it - continue"
-msgstr "Uložil(a) jsem si ho - pokračovat"
-
-#: templates/pretix_pos/organizer/pos.html:80
-msgid "Choose an event"
-msgstr "Vyberte akci"
-
-#: templates/pretix_pos/organizer/pos.html:81
-#: templates/pretix_pos/organizer/pos.html:116
-msgid "Loading…"
-msgstr "Načítání…"
-
-#: templates/pretix_pos/organizer/pos.html:86
-msgid "Till summary"
-msgstr "Přehled pokladny"
-
-#: templates/pretix_pos/organizer/pos.html:88
-msgid ""
-"\n"
-"                            Running totals of everything sold or settled through this terminal,\n"
-"                            broken down by how it was paid. This isn't tied to any date or\n"
-"                            order - it's just this browser's own tally, so reset it yourself at\n"
-"                            the start of a shift.\n"
-"                        "
-msgstr ""
-"\n"
-"                            Průběžné součty všeho prodaného nebo vyřízeného přes tento terminál,\n"
-"                            rozdělené podle způsobu platby. Nejsou vázané na žádné datum ani\n"
-"                            objednávku - jde jen o vlastní součet tohoto prohlížeče, proto si ho\n"
-"                            na začátku směny sami vynulujte.\n"
-"                        "
-
-#: templates/pretix_pos/organizer/pos.html:97
-msgid "Reset to zero"
-msgstr "Vynulovat"
-
-#: templates/pretix_pos/organizer/pos.html:98
-msgid "Close"
-msgstr "Zavřít"
-
-#: templates/pretix_pos/organizer/pos.html:103
-msgid "Date"
-msgstr "Termín"
-
-#: templates/pretix_pos/organizer/pos.html:109
-msgid "Quick reservation"
-msgstr "Rychlá rezervace"
-
-#: templates/pretix_pos/organizer/pos.html:115
-msgid "For orders taken by phone or in person, without picking seats or taking payment now - enter how many of each product for each date, then reserve. Seats (if this event uses them) can be assigned later from the Edit order tab."
-msgstr "Pro objednávky přijaté telefonicky nebo osobně, bez výběru míst nebo okamžité platby - zadejte počet kusů každé položky pro každý termín a rezervujte. Místa (pokud tato akce sezení používá) lze přiřadit později v záložce Upravit objednávku."
-
-#: templates/pretix_pos/organizer/pos.html:121
-msgid "Reserving requires an e-mail or a name, so the order can be found again later."
-msgstr "Rezervace vyžaduje e-mail nebo jméno, aby bylo možné objednávku později znovu najít."
-
-#: templates/pretix_pos/organizer/pos.html:110
-msgid "Sell / Reserve"
-msgstr "Prodat / Rezervovat"
-
-#: templates/pretix_pos/organizer/pos.html:110
-msgid "Edit order"
-msgstr "Upravit objednávku"
-
-#: templates/pretix_pos/organizer/pos.html:115
-msgid "Items"
-msgstr "Položky"
-
-#: templates/pretix_pos/organizer/pos.html:120
-msgid "Click free (green) seats to add them to the cart. Click a selected seat again to remove it."
-msgstr "Kliknutím na volná (zelená) místa je přidáte do košíku. Opětovným kliknutím na vybrané místo ho odeberete."
-
-#: templates/pretix_pos/organizer/pos.html:125
-msgid "Cart"
-msgstr "Košík"
-
-#: templates/pretix_pos/organizer/pos.html:126
-msgid "Empty."
-msgstr "Prázdný."
-
-#: templates/pretix_pos/organizer/pos.html:127
-msgid "Customer e-mail"
-msgstr "E-mail zákazníka"
-
-#: templates/pretix_pos/organizer/pos.html:127
-#: templates/pretix_pos/organizer/pos.html:129
-msgid "optional"
-msgstr "nepovinné"
-
-#: templates/pretix_pos/organizer/pos.html:129
-msgid "Customer name"
-msgstr "Jméno zákazníka"
-
-#: templates/pretix_pos/organizer/pos.html:131
-msgid "Reserving requires an e-mail or a name, so the order can be found again later - selling now doesn't."
-msgstr "Rezervace vyžaduje e-mail nebo jméno, aby bylo možné objednávku později znovu najít - okamžitý prodej ne."
-
-#: templates/pretix_pos/organizer/pos.html:132
-msgid "Payment method"
-msgstr "Způsob platby"
-
-#: templates/pretix_pos/organizer/pos.html:132
-msgid "for “Sell now”"
-msgstr "pro „Prodat ihned“"
-
-#: templates/pretix_pos/organizer/pos.html:134
-msgid "Cash"
-msgstr "Hotovost"
-
-#: templates/pretix_pos/organizer/pos.html:135
-msgid "QR transfer"
-msgstr "QR převod"
-
-#: templates/pretix_pos/organizer/pos.html:136
-msgid "Card"
-msgstr "Karta"
-
-#: templates/pretix_pos/organizer/pos.html:139
-msgid "Reserve"
-msgstr "Rezervovat"
-
-#: templates/pretix_pos/organizer/pos.html:140
-msgid "Sell now"
-msgstr "Prodat ihned"
-
-#: templates/pretix_pos/organizer/pos.html:150
-msgid "Seating plan"
-msgstr "Plán sezení"
-
-#: templates/pretix_pos/organizer/pos.html:151
-msgid "Select an order to place or move seats."
-msgstr "Vyberte objednávku, u které chcete přiřadit nebo přesunout místa."
-
-#: templates/pretix_pos/organizer/pos.html:155
-msgid "Order code, name, e-mail…"
-msgstr "Kód objednávky, jméno, e-mail…"
-
-#: templates/pretix_pos/organizer/pos.html:156
-msgid "Search"
-msgstr "Hledat"
-
-#: templates/pretix_pos/organizer/pos.html:28
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:29
 msgid ""
 "Test mode - nothing sold here is a real ticket, and every order stays "
 "deletable."
@@ -264,15 +59,216 @@ msgstr ""
 "Testovací režim – nic prodaného zde není skutečná vstupenka a každou "
 "objednávku lze smazat."
 
-#: templates/pretix_pos/organizer/pos.html:174
-msgid "Select an order to see its positions."
-msgstr "Vyberte objednávku pro zobrazení jejích pozic."
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:35
+msgid "Pair this terminal"
+msgstr "Spárovat tento terminál"
 
-#: templates/pretix_pos/organizer/pos.html:184
-msgid "This date only"
-msgstr "Jen tento termín"
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:37
+msgid ""
+"\n"
+"                        In the pretix control panel, go to your organizer's "
+"\"Devices\" page, add a\n"
+"                        device (or reuse an existing unpaired one) and open "
+"its \"Connect\" page.\n"
+"                        Paste the token shown there below.\n"
+"                    "
+msgstr ""
+"\n"
+"                        V administraci pretixu přejděte na stránku "
+"„Zařízení“ u vašeho pořadatele,\n"
+"                        přidejte zařízení (nebo použijte již existující "
+"nespárované) a otevřete jeho\n"
+"                        stránku „Připojit“. Zkopírovaný token vložte níže.\n"
+"                    "
 
-#: templates/pretix_pos/organizer/pos.html:140
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:44
+msgid "Initialization token"
+msgstr "Inicializační token"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:46
+msgid "Connect"
+msgstr "Připojit"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:52
+msgid "Already paired this terminal before?"
+msgstr "Byl tento terminál již dříve spárován?"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:54
+msgid ""
+"\n"
+"                        If this browser forgot its connection (its saved "
+"data was cleared, or\n"
+"                        you're on a different computer), restore it yourself "
+"with the recovery\n"
+"                        code you saved when it was first paired here - no "
+"administrator needed.\n"
+"                    "
+msgstr ""
+"\n"
+"                        Pokud tento prohlížeč zapomněl své připojení "
+"(uložená data byla vymazána,\n"
+"                        nebo jste na jiném počítači), obnovte si ho sami "
+"pomocí obnovovacího kódu,\n"
+"                        který jste si uložili při prvním spárování - "
+"administrátor není potřeba.\n"
+"                    "
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:61
+msgid "Recovery code"
+msgstr "Obnovovací kód"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:63
+msgid "Restore"
+msgstr "Obnovit"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:69
+msgid "Save this recovery code"
+msgstr "Uložte si tento obnovovací kód"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:71
+msgid ""
+"\n"
+"                        Write this code down and keep it somewhere safe near "
+"the till (taped\n"
+"                        underneath, in a password manager, with a "
+"manager, ...). If this browser\n"
+"                        ever forgets its connection to this terminal, you "
+"can restore access\n"
+"                        yourself with this exact code - no administrator "
+"needed.\n"
+"                    "
+msgstr ""
+"\n"
+"                        Tento kód si zapište a uschovejte na bezpečném místě "
+"u pokladny (přilepený\n"
+"                        zespodu, v správci hesel, u vedoucího, ...). Pokud "
+"tento prohlížeč někdy\n"
+"                        zapomene své připojení k tomuto terminálu, můžete si "
+"přístup sami obnovit\n"
+"                        pomocí přesně tohoto kódu - administrátor není "
+"potřeba.\n"
+"                    "
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:80
+msgid "Copy"
+msgstr "Kopírovat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:81
+msgid "I've saved it - continue"
+msgstr "Uložil(a) jsem si ho - pokračovat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:86
+msgid "Choose an event"
+msgstr "Vyberte akci"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:87
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:116
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:139
+msgid "Loading…"
+msgstr "Načítání…"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:92
+msgid "Till summary"
+msgstr "Přehled pokladny"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:94
+msgid ""
+"\n"
+"                            Running totals of everything sold or settled "
+"through this terminal,\n"
+"                            broken down by how it was paid. This isn't tied "
+"to any date or\n"
+"                            order - it's just this browser's own tally, so "
+"reset it yourself at\n"
+"                            the start of a shift.\n"
+"                        "
+msgstr ""
+"\n"
+"                            Průběžné součty všeho prodaného nebo vyřízeného "
+"přes tento terminál,\n"
+"                            rozdělené podle způsobu platby. Nejsou vázané na "
+"žádné datum ani\n"
+"                            objednávku - jde jen o vlastní součet tohoto "
+"prohlížeče, proto si ho\n"
+"                            na začátku směny sami vynulujte.\n"
+"                        "
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:103
+msgid "Reset to zero"
+msgstr "Vynulovat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:104
+msgid "Close"
+msgstr "Zavřít"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:109
+msgid "Quick reservation"
+msgstr "Rychlá rezervace"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:110
+msgid "Sell / Reserve"
+msgstr "Prodat / Rezervovat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:111
+msgid "Edit order"
+msgstr "Upravit objednávku"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:115
+msgid ""
+"For orders taken by phone or in person, without picking seats or taking "
+"payment now - enter how many of each product for each date, then reserve. "
+"Seats (if this event uses them) can be assigned later from the Edit order "
+"tab."
+msgstr ""
+"Pro objednávky přijaté telefonicky nebo osobně, bez výběru míst nebo "
+"okamžité platby - zadejte počet kusů každé položky pro každý termín a "
+"rezervujte. Místa (pokud tato akce sezení používá) lze přiřadit později v "
+"záložce Upravit objednávku."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:117
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:152
+msgid "Customer e-mail"
+msgstr "E-mail zákazníka"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:117
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:119
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:152
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:154
+msgid "optional"
+msgstr "nepovinné"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:119
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:154
+msgid "Customer name"
+msgstr "Jméno zákazníka"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:122
+msgid ""
+"Reserving requires an e-mail or a name, so the order can be found again "
+"later."
+msgstr ""
+"Rezervace vyžaduje e-mail nebo jméno, aby bylo možné objednávku později "
+"znovu najít."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:124
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:165
+msgid "Reserve"
+msgstr "Rezervovat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:134
+msgid "Date"
+msgstr "Termín"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:138
+msgid "Items"
+msgstr "Položky"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:142
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:183
+msgid "Seating plan"
+msgstr "Plán sezení"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:143
 msgid ""
 "Click a free seat to add the product its own seating category is mapped to; "
 "click it again to remove it. To sell something else on a seat - a product "
@@ -283,3 +279,122 @@ msgstr ""
 "kategorie sezení; opětovným kliknutím ji odeberete. Chcete-li na místo "
 "prodat něco jiného – produkt s variantami nebo takový, který plán vůbec "
 "nemapuje – stiskněte nejdřív „Usadit tento produkt“ u něj."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:150
+msgid "Cart"
+msgstr "Košík"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:151
+msgid "Empty."
+msgstr "Prázdný."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:157
+msgid ""
+"Reserving requires an e-mail or a name, so the order can be found again "
+"later - selling now doesn't."
+msgstr ""
+"Rezervace vyžaduje e-mail nebo jméno, aby bylo možné objednávku později "
+"znovu najít - okamžitý prodej ne."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:158
+msgid "Payment method"
+msgstr "Způsob platby"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:158
+msgid "for “Sell now”"
+msgstr "pro „Prodat ihned“"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:160
+msgid "Cash"
+msgstr "Hotovost"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:161
+msgid "QR transfer"
+msgstr "QR převod"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:162
+msgid "Card"
+msgstr "Karta"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:166
+msgid "Sell now"
+msgstr "Prodat ihned"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:184
+msgid "Select an order to place or move seats."
+msgstr "Vyberte objednávku, u které chcete přiřadit nebo přesunout místa."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:187
+msgid "Select an order to see its positions."
+msgstr "Vyberte objednávku pro zobrazení jejích pozic."
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:192
+msgid "Order code, name, e-mail…"
+msgstr "Kód objednávky, jméno, e-mail…"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:193
+msgid "Search"
+msgstr "Hledat"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:197
+msgid "This date only"
+msgstr "Jen tento termín"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:200
+msgid "Status"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:202
+msgid "All statuses"
+msgstr "Všechny stavy"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:203
+msgid "Pending"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:204
+msgid "Paid"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:205
+msgid "Expired"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:206
+msgid "Canceled"
+msgstr ""
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:209
+msgid "Sort by"
+msgstr "Řadit podle"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:211
+msgid "Newest first"
+msgstr "Nejnovější nejdřív"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:212
+msgid "Oldest first"
+msgstr "Nejstarší nejdřív"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:213
+msgid "Highest price"
+msgstr "Nejvyšší cena"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:214
+msgid "Lowest price"
+msgstr "Nejnižší cena"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:215
+msgid "Recently changed"
+msgstr "Naposledy změněné"
+
+#: pretix_pos/templates/pretix_pos/organizer/pos.html:218
+msgid "Clear filters"
+msgstr "Zrušit filtry"
+
+#~ msgid ""
+#~ "Click free (green) seats to add them to the cart. Click a selected seat "
+#~ "again to remove it."
+#~ msgstr ""
+#~ "Kliknutím na volná (zelená) místa je přidáte do košíku. Opětovným "
+#~ "kliknutím na vybrané místo ho odeberete."

@@ -2525,6 +2525,9 @@
     var orderPositionsWrapEl = document.getElementById("pos-order-positions");
     var orderSeatmapWrapEl = document.getElementById("pos-order-seatmap-wrap");
     var filterCurrentDateCheckbox = document.getElementById("pos-filter-current-date");
+    var filterStatusSelect = document.getElementById("pos-filter-status");
+    var orderOrderingSelect = document.getElementById("pos-ordering");
+    var clearOrderFiltersBtn = document.getElementById("pos-clear-order-filters");
     var orderSummaryGeneration = 0;
     var orderSummaryLoading = false;
     var orderSummaryNext = null;
@@ -2584,8 +2587,10 @@
 
     function orderSummaryPath(query, page) {
         var path = "/" + encodeURIComponent(ORGANIZER) + "/pos/api/events/" +
-            encodeURIComponent(state.event.slug) + "/orders/?ordering=-datetime&page_size=50";
+            encodeURIComponent(state.event.slug) + "/orders/?ordering=" +
+            encodeURIComponent(orderOrderingSelect.value) + "&page_size=50";
         if (query) path += "&q=" + encodeURIComponent(query);
+        if (filterStatusSelect.value) path += "&status=" + encodeURIComponent(filterStatusSelect.value);
         if (page > 1) path += "&page=" + page;
         if (filterCurrentDateCheckbox.checked && currentSubeventId() != null) {
             path += "&subevent=" + encodeURIComponent(currentSubeventId());
@@ -2637,6 +2642,15 @@
         if (e.key === "Enter") { e.preventDefault(); doSearch(); }
     });
     filterCurrentDateCheckbox.addEventListener("change", doSearch);
+    filterStatusSelect.addEventListener("change", doSearch);
+    orderOrderingSelect.addEventListener("change", doSearch);
+    clearOrderFiltersBtn.addEventListener("click", function () {
+        searchInput.value = "";
+        filterCurrentDateCheckbox.checked = false;
+        filterStatusSelect.value = "";
+        orderOrderingSelect.value = "-datetime";
+        doSearch();
+    });
     searchResultsEl.addEventListener("scroll", maybeLoadMoreOrderSummaries);
 
     // A position only "needs a seat" if its date actually has a seating plan
