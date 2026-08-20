@@ -147,6 +147,25 @@
             });
     }
 
+    // The compact order list is a POS plugin endpoint, not part of core's
+    // /api/v1 namespace. It still uses the same Device token and response
+    // shape as api(), so callers do not need a second authentication path.
+    function posApi(path, opts) {
+        opts = opts || {};
+        var headers = Object.assign({"Content-Type": "application/json"}, opts.headers || {});
+        if (state.token) headers.Authorization = "Device " + state.token;
+        return fetch(path, Object.assign({}, opts, {headers: headers, cache: "no-store"}))
+            .then(function (r) {
+                return r.text().then(function (t) {
+                    var data = null;
+                    if (t) {
+                        try { data = JSON.parse(t); } catch (e) { /* non-JSON error */ }
+                    }
+                    return {status: r.status, ok: r.ok, data: data};
+                });
+            });
+    }
+
     // Same request/response shape as api(), but authenticates with an
     // explicitly-given token instead of state.token - used only by the
     // recovery-code restore flow (pairForm's own submit handler) to validate
@@ -2556,11 +2575,22 @@
 
     function doSearch() {
         var q = searchInput.value.trim();
-        if (!q) {
-            return loadDefaultOrderList();
-        }
         searchResultsEl.textContent = gettext("Searching…");
-        return api(eventPath("/orders/?search=" + encodeURIComponent(q) + "&ordering=-datetime")).then(function (res) {
+        return loadOrderSummaries(q);
+    }
+
+    function orderSummaryPath(query) {
+        var path = "/" + encodeURIComponent(ORGANIZER) + "/pos/api/events/" +
+            encodeURIComponent(state.event.slug) + "/orders/?ordering=-datetime";
+        if (query) path += "&q=" + encodeURIComponent(query);
+        if (filterCurrentDateCheckbox.checked && currentSubeventId() != null) {
+            path += "&subevent=" + encodeURIComponent(currentSubeventId());
+        }
+        return path;
+    }
+
+    function loadOrderSummaries(query) {
+        return posApi(orderSummaryPath(query)).then(function (res) {
             if (!res.ok) {
                 searchResultsEl.textContent = describeError(res.data);
                 return;
@@ -2635,15 +2665,7 @@
     // upfront - sorted with whatever most likely still needs attention first.
     function loadDefaultOrderList() {
         searchResultsEl.textContent = gettext("Loading…");
-        return api(eventPath("/orders/?ordering=-datetime")).then(function (res) {
-            if (!res.ok) {
-                searchResultsEl.textContent = describeError(res.data);
-                return;
-            }
-            var orders = ((res.data && res.data.results) || []).slice();
-            orders.sort(function (a, b) { return orderSortKey(a) - orderSortKey(b); });
-            renderSearchResults(orders);
-        });
+        return loadOrderSummaries("");
     }
 
     // Customers without an e-mail are still identified by whatever name
@@ -2652,22 +2674,14 @@
     // no-email reservation by name at a glance, not just via search.
     function orderCustomerLabel(o) {
         if (o.email) return o.email;
+        if (o.customer_name) return o.customer_name;
         var named = (o.positions || []).find(function (p) { return p.attendee_name; });
         return named ? named.attendee_name : gettext("no e-mail");
     }
 
     function renderSearchResults(orders) {
         searchResultsEl.innerHTML = "";
-        // Filter by current date if checkbox is checked
         var filtered = orders;
-        if (filterCurrentDateCheckbox.checked) {
-            var seId = currentSubeventId();
-            if (seId) {
-                filtered = orders.filter(function (o) {
-                    return (o.positions || []).some(function (p) { return p.subevent == seId; });
-                });
-            }
-        }
         if (!filtered.length) {
             searchResultsEl.textContent = gettext("No matching orders.");
             return;
@@ -2683,9 +2697,8 @@
             // (plain/white) - staff's main question at a glance is "does this
             // still need seats", with payment status as a secondary cue only
             // once seating is already done.
-            var seated = !canceled && orderIsSeated(o);
             div.className = "pos-search-result" +
-                (canceled ? " pos-order-canceled" : seated ? (o.status === "p" ? " pos-order-seated-paid" : " pos-order-seated-unpaid") : "");
+                (canceled ? " pos-order-canceled" : "");
             div.innerHTML = "<span class=\"pos-order-code\"></span>";
             div.querySelector(".pos-order-code").textContent = o.code;
             var pending = parseFloat(pendingSum(o));
@@ -2740,6 +2753,7 @@
     // owed to the customer) instead of clamping at zero, and also what pulls
     // it back towards zero again once recordRefund() records the payout.
     function pendingSum(order) {
+        if (order.pending_sum != null) return String(order.pending_sum);
         // A canceled order's own total (the model field, as returned by the
         // API) still shows whatever it was before cancellation - core's
         // Order.pending_sum property special-cases this to 0 for exactly

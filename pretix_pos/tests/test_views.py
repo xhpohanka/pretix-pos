@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
+
 from django.test import TestCase
 from django_scopes import scopes_disabled
-from pretix.base.models import Organizer
+from pretix.base.models import Event, Organizer, Team, User
 
 from pretix_pos.channels import POSSalesChannelType
 
@@ -51,3 +53,32 @@ class POSAppViewTest(TestCase):
     def test_unknown_organizer_404s(self):
         resp = self.client.get("/does-not-exist/pos/")
         self.assertEqual(resp.status_code, 404)
+
+
+class POSOrderSummaryViewTest(TestCase):
+    @scopes_disabled()
+    def setUp(self):
+        self.organizer = Organizer.objects.create(name="Dummy", slug="dummy")
+        self.organizer.plugins = "pretix_pos"
+        self.organizer.save()
+        self.event = Event.objects.create(
+            organizer=self.organizer, name="Event", slug="event",
+            date_from=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        self.event.plugins = "pretix_pos"
+        self.event.save()
+        self.user = User.objects.create_user("staff@example.com", "test")
+        team = Team.objects.create(organizer=self.organizer, name="Staff", all_event_permissions=True)
+        team.all_events = True
+        team.save()
+        team.members.add(self.user)
+        self.client.force_login(self.user)
+
+    def test_returns_paginated_summary_and_validates_status(self):
+        url = f"/{self.organizer.slug}/pos/api/events/{self.event.slug}/orders/"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["results"], [])
+
+        response = self.client.get(url, {"status": "not-a-status"})
+        self.assertEqual(response.status_code, 400)
