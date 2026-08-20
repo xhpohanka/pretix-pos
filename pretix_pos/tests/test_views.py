@@ -113,6 +113,7 @@ class POSOrderSummaryViewTest(TestCase):
         response = self.client.get(url, {"payment": "paid", "source": "pos"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual([o["code"] for o in response.json()["results"]], ["POSPAID"])
+        self.assertEqual(response.json()["results"][0]["sales_channel_identifier"], "pretix_pos")
 
         response = self.client.get(url, {"payment": "unpaid", "expiry": "overdue", "source": "other"})
         self.assertEqual(response.status_code, 200)

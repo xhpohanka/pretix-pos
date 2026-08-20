@@ -85,6 +85,7 @@ class POSOrderSummaryView(APIView):
             position_count=Count("all_positions", filter=Q(all_positions__canceled=False)),
             customer_name=Min("all_positions__attendee_name_cached", filter=Q(all_positions__canceled=False)),
             needs_seating=Exists(unseated_seated_position),
+            sales_channel_identifier=F("sales_channel__identifier"),
             pending_sum=Case(
                 When(status=Order.STATUS_CANCELED, then=F("pending_sum_rc")),
                 default=F("pending_sum_t"),
@@ -112,7 +113,7 @@ class POSOrderSummaryView(APIView):
         page = Pagination()
         summaries = queryset.values(
             "code", "status", "datetime", "last_modified", "expires", "total", "pending_sum",
-            "email", "customer_name", "position_count", "needs_seating", "sales_channel_id",
+            "email", "customer_name", "position_count", "needs_seating", "sales_channel_identifier",
         )
         result_page = page.paginate_queryset(summaries, request, view=self)
         return page.get_paginated_response(result_page)

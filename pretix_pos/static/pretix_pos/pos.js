@@ -2795,6 +2795,11 @@
             var pending = parseFloat(pendingSum(o));
             var line = " — " + orderCustomerLabel(o) + " — " + o.status + " — " +
                 interpolate(gettext("total %(total)s"), {total: o.total}, true);
+            if (o.sales_channel_identifier) {
+                line += " — " + (o.sales_channel_identifier === SALES_CHANNEL
+                    ? gettext("POS")
+                    : gettext("other channel"));
+            }
             if (pending > 0) {
                 line += ", " + interpolate(gettext("pending %(amount)s"), {amount: pending.toFixed(2)}, true);
             } else if (pending < 0) {
