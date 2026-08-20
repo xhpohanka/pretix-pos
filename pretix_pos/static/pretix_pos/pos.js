@@ -3684,7 +3684,7 @@
         function setSeatmapHelp() {
             var title = document.getElementById("pos-order-seatmap-title");
             if (!title) return;
-            title.title = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. What clicking does depends on the checkboxes in the position list: with positions checked you are placing seats, so clicks and rectangle drags pick free seats; with nothing checked you are clearing seats, so they pick this order's own seats instead. Either way the selection is only staged - shown with a ring - until you press the button next to the legend. Hold Alt to remove seats from a staged selection; use × or Escape to clear it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging); hold Ctrl while dragging to move its whole block of seats together. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
+            title.title = gettext("This order's own seats (for the date selected above) are shown in a muted highlight color. What clicking does depends on the checkboxes in the position list: with positions checked you are placing seats, so clicks and rectangle drags pick free seats; with nothing checked you are clearing seats, so they pick this order's own seats instead. Either way the selection is only staged - shown with a ring - until you press the button next to the legend. Hold Alt to remove seats from a staged selection; use × or Escape to clear it. Drag one of this order's own seats onto a free seat to move it (shown as a translucent preview while dragging). If it is in the staged selection, only that selection moves; otherwise hold Ctrl to move the whole block of this order's seats. Hover any occupied seat to see which order holds it, or double-click it to jump straight to that order. Positions for other dates are listed above, greyed out - switch the date to work with them.");
         }
 
         function legendItem(swatchStyle, text) {
@@ -4368,6 +4368,12 @@
                 .filter(Boolean);
         }
 
+        function selectedOwnPositions() {
+            return Object.keys(removalPool)
+                .map(function (guid) { return ownPositionOfSeat(removalPool[guid]); })
+                .filter(Boolean);
+        }
+
         // Two distinct "yours" states, same split as the eshop picker's own
         // isSelected/mine (see initPick in seatmap.js): a pool seat is only
         // *staged* - it still needs "Place selected" clicked to actually take
@@ -4515,13 +4521,14 @@
 
         // Translucent preview of where a seat-move drag would land, so staff
         // don't have to drop first to see the result - just the one dragged
-        // seat normally, or the whole block (see ownSeats()) while Ctrl is
-        // held, matching whichever action mouseup would actually take.
+        // seat normally, the staged subset when it contains that seat, or the
+        // whole block (see ownSeats()) while Ctrl is held.
         // Cleaned up at mouseup by removing drag.ghostEls directly (drag is
         // already nulled out to `d` by then, see seatMapMouseUpHandler).
         function updateGhosts(pt, ctrlHeld) {
             var dx = pt.x - drag.startPt.x, dy = pt.y - drag.startPt.y;
-            var sourceSeats = ctrlHeld ? ownSeats() : [drag.clickSeat];
+            var sourceSeats = drag.selectedSeats.length ? drag.selectedSeats :
+                (ctrlHeld ? ownSeats() : [drag.clickSeat]);
             while (drag.ghostEls.length < sourceSeats.length) {
                 var c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
                 c.setAttribute("class", "pos-drag-ghost");
@@ -4543,11 +4550,16 @@
             if (e.button !== 0) return;
             svg.focus();
             var seat = seatAtEvent(e);
+            var selectedPositions = seat && removalPool[seat.guid] ? selectedOwnPositions() : [];
             drag = {
                 startPt: svgPoint(e),
                 moved: false,
                 clickSeat: seat,
                 movePosition: seat ? ownPositionOfSeat(seat) : null,
+                selectedPositions: selectedPositions,
+                selectedSeats: selectedPositions.map(function (p) {
+                    return seats.find(function (s) { return s.guid === p.seat.seat_guid; });
+                }).filter(Boolean),
                 rectEl: null,
                 ghostEls: [],
             };
@@ -4628,7 +4640,7 @@
             if (d.movePosition) {
                 var target = seatAtEvent(e);
                 if (target) {
-                    if (e.ctrlKey) {
+                    if (d.selectedPositions.length || e.ctrlKey) {
                         // Unlike the single-seat move below, don't require
                         // target.status === "free" here - moveBlock() itself
                         // already accepts a target that's merely occupied by
@@ -4637,7 +4649,7 @@
                         // Requiring "free" at this outer gate would silently
                         // reject exactly that valid case before moveBlock()
                         // ever runs.
-                        moveBlock(d.clickSeat, target);
+                        moveBlock(d.clickSeat, target, d.selectedPositions);
                     } else if (target.status === "free") {
                         movePositionSeat(d.movePosition, target.guid);
                     }
@@ -4874,17 +4886,18 @@
             });
         }
 
-        // Ctrl+drag moves this order's whole block of assigned seats together,
+        // A drag on a staged subset moves just that subset; Ctrl+drag without
+        // such a subset moves this order's whole block of assigned seats.
         // by the same x/y offset as the one seat that was actually dragged.
         // Every other seat in the block must resolve to a seat at the offset
         // position that's either free or itself part of the block (about to be
         // vacated by this same move) - otherwise the whole move is refused
         // rather than silently moving only some of the seats.
-        function moveBlock(draggedSeat, targetSeat) {
+        function moveBlock(draggedSeat, targetSeat, selectedPositions) {
             var dx = targetSeat.x - draggedSeat.x, dy = targetSeat.y - draggedSeat.y;
             if (!dx && !dy) return;
 
-            var blockPositions = (currentOrder.positions || []).filter(function (p) {
+            var blockPositions = selectedPositions.length ? selectedPositions : (currentOrder.positions || []).filter(function (p) {
                 return !p.canceled && p.seat && subeventsMatch(p.subevent, subeventId);
             });
             var blockGuids = {};
